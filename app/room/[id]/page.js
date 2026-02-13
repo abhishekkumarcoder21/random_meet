@@ -33,9 +33,10 @@ export default function RoomPage({ params }) {
 
     // WebRTC
     const {
-        localStream, remoteStreams, isCallActive,
-        isMicOn, isCameraOn, callError,
-        startCall, endCall, toggleMic, toggleCamera
+        localStream, remoteStreams, callState, callType,
+        isMicOn, isCameraOn, callError, incomingCall,
+        startCall, cancelCall, acceptCall, declineCall,
+        endCall, toggleMic, toggleCamera
     } = useWebRTC(socketRef, roomId);
 
     useEffect(() => {
@@ -292,10 +293,44 @@ export default function RoomPage({ params }) {
                 </div>
             )}
 
+            {/* Incoming Call Overlay */}
+            {callState === 'ringing' && incomingCall && (
+                <div className={styles.incomingCallOverlay}>
+                    <div className={styles.incomingCallCard}>
+                        <div className={styles.callerAvatar}>
+                            <div className={styles.callerAvatarPulse}></div>
+                            <span>{incomingCall.callType === 'video' ? '📹' : '🎙️'}</span>
+                        </div>
+                        <h3 className={styles.callerName}>{incomingCall.alias || 'Someone'}</h3>
+                        <p className={styles.callerDesc}>
+                            Incoming {incomingCall.callType === 'video' ? 'video' : 'voice'} call...
+                        </p>
+                        <div className={styles.incomingActions}>
+                            <button className={styles.declineBtn} onClick={declineCall}>
+                                <span>✕</span>
+                                Decline
+                            </button>
+                            <button className={styles.acceptBtn} onClick={acceptCall}>
+                                <span>✓</span>
+                                Accept
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Outgoing Call Waiting */}
+            {callState === 'calling' && (
+                <div className={styles.outgoingCallBar}>
+                    <div className={styles.callingPulse}></div>
+                    <span>📞 Calling... waiting for answer</span>
+                    <button className="btn btn-ghost btn-sm" onClick={cancelCall}>Cancel</button>
+                </div>
+            )}
+
             {/* Video Grid (shown when call is active) */}
-            {isCallActive && (
+            {callState === 'active' && (
                 <div className={styles.videoGrid}>
-                    {/* Self view */}
                     {localStream && (
                         <VideoTile
                             stream={localStream}
@@ -305,7 +340,6 @@ export default function RoomPage({ params }) {
                             isCameraOff={!isCameraOn}
                         />
                     )}
-                    {/* Remote peers */}
                     {Array.from(remoteStreams.entries()).map(([socketId, peer]) => (
                         <VideoTile
                             key={socketId}
@@ -322,7 +356,7 @@ export default function RoomPage({ params }) {
             {/* Call Controls */}
             {!isEnded && (
                 <div className={styles.callControls}>
-                    {!isCallActive ? (
+                    {callState === 'idle' ? (
                         <>
                             <button className={`btn btn-primary btn-sm ${styles.callBtn}`} onClick={() => startCall(true)}>
                                 📹 Video Call
@@ -331,7 +365,7 @@ export default function RoomPage({ params }) {
                                 🎙️ Voice Only
                             </button>
                         </>
-                    ) : (
+                    ) : callState === 'active' ? (
                         <>
                             <button
                                 className={`${styles.mediaBtn} ${!isMicOn ? styles.mediaBtnOff : ''}`}
@@ -355,7 +389,7 @@ export default function RoomPage({ params }) {
                                 📞
                             </button>
                         </>
-                    )}
+                    ) : null}
                     {callError && <span className={styles.callError}>{callError}</span>}
                 </div>
             )}

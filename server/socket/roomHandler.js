@@ -178,9 +178,44 @@ function setupSocketHandlers(io, prisma) {
             });
         });
 
-        // Notify others that this peer started a call
-        socket.on('call-started', ({ roomId }) => {
-            socket.to(roomId).emit('call-started', {
+        // ====== Call Ringing Flow ======
+
+        // Caller sends invite to room
+        socket.on('call-invite', ({ roomId, callType }) => {
+            socket.to(roomId).emit('call-invite', {
+                fromSocketId: socket.id,
+                alias: socket.alias,
+                callType // 'video' or 'voice'
+            });
+        });
+
+        // Receiver accepts the call
+        socket.on('call-accept', ({ toSocketId, roomId }) => {
+            io.to(toSocketId).emit('call-accepted', {
+                fromSocketId: socket.id,
+                alias: socket.alias
+            });
+        });
+
+        // Receiver declines the call
+        socket.on('call-decline', ({ toSocketId, roomId }) => {
+            io.to(toSocketId).emit('call-declined', {
+                fromSocketId: socket.id,
+                alias: socket.alias
+            });
+        });
+
+        // Caller cancels outgoing call
+        socket.on('call-cancel', ({ roomId }) => {
+            socket.to(roomId).emit('call-cancelled', {
+                fromSocketId: socket.id,
+                alias: socket.alias
+            });
+        });
+
+        // Someone ends active call
+        socket.on('call-ended', ({ roomId }) => {
+            socket.to(roomId).emit('call-ended', {
                 fromSocketId: socket.id,
                 alias: socket.alias
             });
