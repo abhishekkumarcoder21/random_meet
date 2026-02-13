@@ -143,6 +143,15 @@ function setupSocketHandlers(io, prisma) {
             });
         });
 
+        // Relay WebRTC offer to a specific peer (targeted)
+        socket.on('webrtc-offer-direct', ({ toSocketId, offer }) => {
+            io.to(toSocketId).emit('webrtc-offer', {
+                offer,
+                fromSocketId: socket.id,
+                fromAlias: socket.alias
+            });
+        });
+
         // Relay WebRTC answer back to the offering peer
         socket.on('webrtc-answer', ({ toSocketId, answer }) => {
             io.to(toSocketId).emit('webrtc-answer', {

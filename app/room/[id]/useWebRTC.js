@@ -102,7 +102,13 @@ export function useWebRTC(socketRef, roomId, socketReady) {
 
     const createPeerConnection = useCallback((remoteSocketId, remoteAlias) => {
         if (peerConnections.current.has(remoteSocketId)) {
-            return peerConnections.current.get(remoteSocketId);
+            const existing = peerConnections.current.get(remoteSocketId);
+            // Reuse only if still usable; otherwise close and recreate
+            if (existing.connectionState !== 'closed' && existing.connectionState !== 'failed') {
+                return existing;
+            }
+            existing.close();
+            peerConnections.current.delete(remoteSocketId);
         }
 
         const pc = new RTCPeerConnection(ICE_SERVERS);
@@ -369,12 +375,13 @@ export function useWebRTC(socketRef, roomId, socketReady) {
             setCallState('active');
             callStateRef.current = 'active';
 
-            // Now create peer connection and send offer
+            // Now create peer connection and send offer directly to the peer who accepted
             const pc = createPeerConnection(fromSocketId, alias);
             try {
                 const offer = await pc.createOffer();
                 await pc.setLocalDescription(offer);
-                socket.emit('webrtc-offer', { roomId, offer: pc.localDescription });
+                // Send directly to the accepting peer, not broadcast to room
+                socket.emit('webrtc-offer-direct', { toSocketId: fromSocketId, offer: pc.localDescription });
             } catch (err) {
                 console.error('Error creating offer after accept:', err);
             }
@@ -426,7 +433,8 @@ export function useWebRTC(socketRef, roomId, socketReady) {
 
         // WebRTC signaling
         const handleOffer = async ({ offer, fromSocketId, fromAlias }) => {
-            if (!localStreamRef.current) return;
+            // Only reject if we're completely idle (not in any call state)
+            if (callStateRef.current === 'idle' && !localStreamRef.current) return;
             const pc = createPeerConnection(fromSocketId, fromAlias);
             try {
                 await pc.setRemoteDescription(new RTCSessionDescription(offer));
