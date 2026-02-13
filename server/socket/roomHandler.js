@@ -132,11 +132,70 @@ function setupSocketHandlers(io, prisma) {
             });
         });
 
+        // ====== WebRTC Signaling ======
+
+        // Relay WebRTC offer to all other peers in the room
+        socket.on('webrtc-offer', ({ roomId, offer }) => {
+            socket.to(roomId).emit('webrtc-offer', {
+                offer,
+                fromSocketId: socket.id,
+                fromAlias: socket.alias
+            });
+        });
+
+        // Relay WebRTC answer back to the offering peer
+        socket.on('webrtc-answer', ({ toSocketId, answer }) => {
+            io.to(toSocketId).emit('webrtc-answer', {
+                answer,
+                fromSocketId: socket.id,
+                fromAlias: socket.alias
+            });
+        });
+
+        // Relay ICE candidates between peers
+        socket.on('webrtc-ice-candidate', ({ toSocketId, candidate }) => {
+            io.to(toSocketId).emit('webrtc-ice-candidate', {
+                candidate,
+                fromSocketId: socket.id
+            });
+        });
+
+        // Broadcast ICE candidate to all peers (for initial offers)
+        socket.on('webrtc-ice-candidate-broadcast', ({ roomId, candidate }) => {
+            socket.to(roomId).emit('webrtc-ice-candidate', {
+                candidate,
+                fromSocketId: socket.id
+            });
+        });
+
+        // Notify others when media is toggled
+        socket.on('toggle-media', ({ roomId, kind, enabled }) => {
+            socket.to(roomId).emit('peer-media-toggle', {
+                fromSocketId: socket.id,
+                alias: socket.alias,
+                kind, // 'audio' or 'video'
+                enabled
+            });
+        });
+
+        // Notify others that this peer started a call
+        socket.on('call-started', ({ roomId }) => {
+            socket.to(roomId).emit('call-started', {
+                fromSocketId: socket.id,
+                alias: socket.alias
+            });
+        });
+
         // Handle disconnect
         socket.on('disconnect', async () => {
             console.log(`🔌 User disconnected: ${socket.userId}`);
             if (socket.roomId) {
                 socket.to(socket.roomId).emit('user-left', {
+                    alias: socket.alias
+                });
+                // Notify peers to clean up WebRTC connections
+                socket.to(socket.roomId).emit('peer-disconnected', {
+                    fromSocketId: socket.id,
                     alias: socket.alias
                 });
             }

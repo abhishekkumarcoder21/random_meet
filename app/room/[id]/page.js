@@ -2,6 +2,8 @@
 import { useState, useEffect, useRef, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { io } from 'socket.io-client';
+import { useWebRTC } from './useWebRTC';
+import { VideoTile } from './VideoTile';
 import styles from './room.module.css';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -28,6 +30,13 @@ export default function RoomPage({ params }) {
     const socketRef = useRef(null);
     const messagesEndRef = useRef(null);
     const timerRef = useRef(null);
+
+    // WebRTC
+    const {
+        localStream, remoteStreams, isCallActive,
+        isMicOn, isCameraOn, callError,
+        startCall, endCall, toggleMic, toggleCamera
+    } = useWebRTC(socketRef, roomId);
 
     useEffect(() => {
         const token = localStorage.getItem('rm_token');
@@ -280,6 +289,74 @@ export default function RoomPage({ params }) {
             {warning && (
                 <div className={styles.warningBanner}>
                     ⚠️ {warning}
+                </div>
+            )}
+
+            {/* Video Grid (shown when call is active) */}
+            {isCallActive && (
+                <div className={styles.videoGrid}>
+                    {/* Self view */}
+                    {localStream && (
+                        <VideoTile
+                            stream={localStream}
+                            alias={myAlias}
+                            isMe={true}
+                            isMuted={!isMicOn}
+                            isCameraOff={!isCameraOn}
+                        />
+                    )}
+                    {/* Remote peers */}
+                    {Array.from(remoteStreams.entries()).map(([socketId, peer]) => (
+                        <VideoTile
+                            key={socketId}
+                            stream={peer.stream}
+                            alias={peer.alias}
+                            isMe={false}
+                            isMuted={!peer.audioEnabled}
+                            isCameraOff={!peer.videoEnabled}
+                        />
+                    ))}
+                </div>
+            )}
+
+            {/* Call Controls */}
+            {!isEnded && (
+                <div className={styles.callControls}>
+                    {!isCallActive ? (
+                        <>
+                            <button className={`btn btn-primary btn-sm ${styles.callBtn}`} onClick={() => startCall(true)}>
+                                📹 Video Call
+                            </button>
+                            <button className={`btn btn-secondary btn-sm ${styles.callBtn}`} onClick={() => startCall(false)}>
+                                🎙️ Voice Only
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <button
+                                className={`${styles.mediaBtn} ${!isMicOn ? styles.mediaBtnOff : ''}`}
+                                onClick={toggleMic}
+                                title={isMicOn ? 'Mute mic' : 'Unmute mic'}
+                            >
+                                {isMicOn ? '🎙️' : '🔇'}
+                            </button>
+                            <button
+                                className={`${styles.mediaBtn} ${!isCameraOn ? styles.mediaBtnOff : ''}`}
+                                onClick={toggleCamera}
+                                title={isCameraOn ? 'Turn off camera' : 'Turn on camera'}
+                            >
+                                {isCameraOn ? '📹' : '📷'}
+                            </button>
+                            <button
+                                className={`${styles.mediaBtn} ${styles.endCallBtn}`}
+                                onClick={endCall}
+                                title="End call"
+                            >
+                                📞
+                            </button>
+                        </>
+                    )}
+                    {callError && <span className={styles.callError}>{callError}</span>}
                 </div>
             )}
 
