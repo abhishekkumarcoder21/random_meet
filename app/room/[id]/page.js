@@ -26,6 +26,7 @@ export default function RoomPage({ params }) {
     const [reportReason, setReportReason] = useState('');
     const [floatingReactions, setFloatingReactions] = useState([]);
     const [socketError, setSocketError] = useState('');
+    const [socketReady, setSocketReady] = useState(false);
 
     const socketRef = useRef(null);
     const messagesEndRef = useRef(null);
@@ -37,7 +38,7 @@ export default function RoomPage({ params }) {
         isMicOn, isCameraOn, callError, incomingCall,
         startCall, cancelCall, acceptCall, declineCall,
         endCall, toggleMic, toggleCamera
-    } = useWebRTC(socketRef, roomId);
+    } = useWebRTC(socketRef, roomId, socketReady);
 
     useEffect(() => {
         const token = localStorage.getItem('rm_token');
@@ -54,8 +55,11 @@ export default function RoomPage({ params }) {
             auth: { token }
         });
 
+        socketRef.current = socket;
+
         socket.on('connect', () => {
             socket.emit('join-room', { roomId });
+            setSocketReady(true);
         });
 
         socket.on('connect_error', (err) => {
@@ -140,11 +144,11 @@ export default function RoomPage({ params }) {
             setTimeout(() => setSocketError(''), 3000);
         });
 
-        socketRef.current = socket;
 
         return () => {
             clearInterval(timerRef.current);
             socket.disconnect();
+            setSocketReady(false);
         };
     }, [roomId]);
 

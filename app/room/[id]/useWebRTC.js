@@ -9,8 +9,7 @@ const ICE_SERVERS = {
     ]
 };
 
-// Call states: idle → calling (outgoing) / ringing (incoming) → active → idle
-export function useWebRTC(socketRef, roomId) {
+export function useWebRTC(socketRef, roomId, socketReady) {
     const [localStream, setLocalStream] = useState(null);
     const [remoteStreams, setRemoteStreams] = useState(new Map());
     const [callState, setCallState] = useState('idle'); // idle | calling | ringing | active
@@ -18,52 +17,74 @@ export function useWebRTC(socketRef, roomId) {
     const [isCameraOn, setIsCameraOn] = useState(true);
     const [callError, setCallError] = useState('');
     const [incomingCall, setIncomingCall] = useState(null); // { fromSocketId, alias, callType }
-    const [callType, setCallType] = useState('video'); // video | voice
+    const [callType, setCallType] = useState('video');
 
     const peerConnections = useRef(new Map());
     const localStreamRef = useRef(null);
     const pendingCandidates = useRef(new Map());
-    const ringtoneRef = useRef(null);
     const ringTimeoutRef = useRef(null);
+    const ringtoneRef = useRef(null);
+    // Use refs to avoid stale closures in socket handlers
+    const callStateRef = useRef('idle');
+    const incomingCallRef = useRef(null);
+    const playRingtoneRef = useRef(null);
+    const stopRingtoneRef = useRef(null);
 
-    // Play ringing sound
-    const playRingtone = useCallback(() => {
-        try {
-            // Create a simple ringing tone using Web Audio API
-            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            const oscillator = audioCtx.createOscillator();
-            const gainNode = audioCtx.createGain();
-            oscillator.connect(gainNode);
-            gainNode.connect(audioCtx.destination);
-            oscillator.frequency.value = 440;
-            oscillator.type = 'sine';
-            gainNode.gain.value = 0.1;
+    // Keep refs in sync with state
+    useEffect(() => { callStateRef.current = callState; }, [callState]);
+    useEffect(() => { incomingCallRef.current = incomingCall; }, [incomingCall]);
 
-            // Ring pattern: on 1s, off 2s
-            const ringInterval = setInterval(() => {
-                oscillator.frequency.value = 440;
-                gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
-                gainNode.gain.setValueAtTime(0, audioCtx.currentTime + 1);
-            }, 3000);
-
-            oscillator.start();
-            ringtoneRef.current = { audioCtx, oscillator, gainNode, ringInterval };
-        } catch { }
-    }, []);
-
+    // ====== Ringtone using Web Audio API ======
     const stopRingtone = useCallback(() => {
         if (ringtoneRef.current) {
-            const { audioCtx, oscillator, ringInterval } = ringtoneRef.current;
-            clearInterval(ringInterval);
-            try { oscillator.stop(); } catch { }
+            const { intervalId, audioCtx } = ringtoneRef.current;
+            clearInterval(intervalId);
             try { audioCtx.close(); } catch { }
             ringtoneRef.current = null;
         }
-        if (ringTimeoutRef.current) {
-            clearTimeout(ringTimeoutRef.current);
-            ringTimeoutRef.current = null;
-        }
     }, []);
+
+    const playRingtone = useCallback((type) => {
+        // type: 'incoming' (classic ring) or 'outgoing' (ring-back)
+        stopRingtone();
+        try {
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+            const playBeep = (freq, duration, startTime) => {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.frequency.value = freq;
+                osc.type = 'sine';
+                gain.gain.setValueAtTime(0.12, startTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+                osc.start(startTime);
+                osc.stop(startTime + duration);
+            };
+
+            // Play immediately
+            const ringOnce = () => {
+                const now = audioCtx.currentTime;
+                if (type === 'incoming') {
+                    // Classic double-ring: two short beeps
+                    playBeep(440, 0.4, now);
+                    playBeep(440, 0.4, now + 0.5);
+                } else {
+                    // Ring-back: single longer tone
+                    playBeep(400, 1.2, now);
+                }
+            };
+
+            ringOnce();
+            const intervalId = setInterval(ringOnce, type === 'incoming' ? 2500 : 3500);
+            ringtoneRef.current = { audioCtx, intervalId };
+        } catch { }
+    }, [stopRingtone]);
+
+    // Keep function refs in sync
+    useEffect(() => { playRingtoneRef.current = playRingtone; }, [playRingtone]);
+    useEffect(() => { stopRingtoneRef.current = stopRingtone; }, [stopRingtone]);
 
     const cleanupPeer = useCallback((socketId) => {
         const pc = peerConnections.current.get(socketId);
@@ -136,7 +157,6 @@ export function useWebRTC(socketRef, roomId) {
         return pc;
     }, [socketRef, cleanupPeer]);
 
-    // Get media stream
     const getMediaStream = useCallback(async (withVideo) => {
         return navigator.mediaDevices.getUserMedia({
             audio: true,
@@ -148,33 +168,44 @@ export function useWebRTC(socketRef, roomId) {
         });
     }, []);
 
-    // Initiate a call — send invite to room, wait for accept
+    // Initiate a call
     const startCall = useCallback(async (videoEnabled = true) => {
         try {
             setCallError('');
             const type = videoEnabled ? 'video' : 'voice';
             setCallType(type);
             setCallState('calling');
+            callStateRef.current = 'calling';
 
-            // Get local media first so we're ready when accepted
             const stream = await getMediaStream(videoEnabled);
             localStreamRef.current = stream;
             setLocalStream(stream);
             setIsMicOn(true);
             setIsCameraOn(videoEnabled);
 
-            // Send call invite to everyone in the room
+            // Send invite to room
             socketRef.current?.emit('call-invite', { roomId, callType: type });
 
-            // Auto-cancel after 30s if no one answers
+            // Play outgoing ring-back tone
+            playRingtone('outgoing');
+
+            // Auto-cancel after 30s
             ringTimeoutRef.current = setTimeout(() => {
-                if (callState === 'calling') {
-                    cancelCall();
+                if (callStateRef.current === 'calling') {
+                    stopRingtone();
+                    socketRef.current?.emit('call-cancel', { roomId });
+                    localStreamRef.current?.getTracks().forEach(t => t.stop());
+                    localStreamRef.current = null;
+                    setLocalStream(null);
+                    setCallState('idle');
+                    callStateRef.current = 'idle';
+                    setCallError('No answer.');
+                    setTimeout(() => setCallError(''), 3000);
                 }
             }, 30000);
-
         } catch (err) {
             setCallState('idle');
+            callStateRef.current = 'idle';
             if (err.name === 'NotAllowedError') {
                 setCallError('Camera/mic permission denied.');
             } else if (err.name === 'NotFoundError') {
@@ -188,73 +219,69 @@ export function useWebRTC(socketRef, roomId) {
     // Cancel outgoing call
     const cancelCall = useCallback(() => {
         stopRingtone();
+        if (ringTimeoutRef.current) clearTimeout(ringTimeoutRef.current);
         socketRef.current?.emit('call-cancel', { roomId });
-
         localStreamRef.current?.getTracks().forEach(t => t.stop());
         localStreamRef.current = null;
         setLocalStream(null);
         setCallState('idle');
-        setCallType('video');
-    }, [socketRef, roomId, stopRingtone]);
+        callStateRef.current = 'idle';
+    }, [socketRef, roomId]);
 
     // Accept incoming call
     const acceptCall = useCallback(async () => {
-        if (!incomingCall) return;
+        const incoming = incomingCallRef.current;
+        if (!incoming) return;
 
         stopRingtone();
-        const { fromSocketId, alias, callType: type } = incomingCall;
+        if (ringTimeoutRef.current) clearTimeout(ringTimeoutRef.current);
+        const { fromSocketId, callType: type } = incoming;
 
         try {
             setCallType(type);
             const withVideo = type === 'video';
 
-            // Get local media
             const stream = await getMediaStream(withVideo);
             localStreamRef.current = stream;
             setLocalStream(stream);
             setIsMicOn(true);
             setIsCameraOn(withVideo);
             setCallState('active');
+            callStateRef.current = 'active';
             setIncomingCall(null);
+            incomingCallRef.current = null;
 
-            // Notify the caller that we accepted
-            socketRef.current?.emit('call-accept', {
-                toSocketId: fromSocketId,
-                roomId
-            });
-
-            // Create peer connection and send offer
-            const pc = createPeerConnection(fromSocketId, alias);
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-            socketRef.current?.emit('webrtc-offer', {
-                roomId,
-                offer: pc.localDescription
-            });
+            // Notify caller — the caller will then create and send the WebRTC offer
+            socketRef.current?.emit('call-accept', { toSocketId: fromSocketId, roomId });
 
         } catch (err) {
+            console.error('Accept call error:', err);
             setCallState('idle');
+            callStateRef.current = 'idle';
             setIncomingCall(null);
+            incomingCallRef.current = null;
             setCallError('Failed to accept call.');
         }
-    }, [incomingCall, socketRef, roomId, getMediaStream, createPeerConnection, stopRingtone]);
+    }, [socketRef, roomId, getMediaStream, createPeerConnection]);
 
     // Decline incoming call
     const declineCall = useCallback(() => {
         stopRingtone();
-        if (incomingCall) {
-            socketRef.current?.emit('call-decline', {
-                toSocketId: incomingCall.fromSocketId,
-                roomId
-            });
+        if (ringTimeoutRef.current) clearTimeout(ringTimeoutRef.current);
+        const incoming = incomingCallRef.current;
+        if (incoming) {
+            socketRef.current?.emit('call-decline', { toSocketId: incoming.fromSocketId, roomId });
         }
         setIncomingCall(null);
+        incomingCallRef.current = null;
         setCallState('idle');
-    }, [incomingCall, socketRef, roomId, stopRingtone]);
+        callStateRef.current = 'idle';
+    }, [socketRef, roomId]);
 
     // End active call
     const endCall = useCallback(() => {
         stopRingtone();
+        if (ringTimeoutRef.current) clearTimeout(ringTimeoutRef.current);
         localStreamRef.current?.getTracks().forEach(track => track.stop());
         localStreamRef.current = null;
         setLocalStream(null);
@@ -265,12 +292,14 @@ export function useWebRTC(socketRef, roomId) {
 
         setRemoteStreams(new Map());
         setCallState('idle');
+        callStateRef.current = 'idle';
         setIsMicOn(true);
         setIsCameraOn(true);
         setIncomingCall(null);
+        incomingCallRef.current = null;
 
         socketRef.current?.emit('call-ended', { roomId });
-    }, [socketRef, roomId, stopRingtone]);
+    }, [socketRef, roomId]);
 
     // Toggle mic
     const toggleMic = useCallback(() => {
@@ -294,76 +323,108 @@ export function useWebRTC(socketRef, roomId) {
         }
     }, [socketRef, roomId]);
 
-    // Socket listeners
+    // Socket listeners — registered ONCE, use refs for current state
     useEffect(() => {
         const socket = socketRef.current;
         if (!socket) return;
 
         // Incoming call invite
         const handleCallInvite = ({ fromSocketId, alias, callType: type }) => {
-            // Ignore if already in a call
-            if (callState === 'active' || callState === 'calling') return;
+            console.log('📞 call-invite received from', alias, '| current state:', callStateRef.current);
+            // Ignore if already busy
+            if (callStateRef.current === 'active' || callStateRef.current === 'ringing') return;
+
+            // If we're also calling, the lower socket ID accepts (tie-break)
+            if (callStateRef.current === 'calling') {
+                // Both calling at once — one should accept automatically
+                return;
+            }
 
             setIncomingCall({ fromSocketId, alias, callType: type });
+            incomingCallRef.current = { fromSocketId, alias, callType: type };
             setCallState('ringing');
-            playRingtone();
+            callStateRef.current = 'ringing';
+
+            // Play incoming ringtone
+            playRingtoneRef.current?.('incoming');
 
             // Auto-decline after 30s
             ringTimeoutRef.current = setTimeout(() => {
-                setIncomingCall(null);
-                setCallState('idle');
-                stopRingtone();
-                socket.emit('call-decline', { toSocketId: fromSocketId, roomId });
+                if (callStateRef.current === 'ringing') {
+                    stopRingtoneRef.current?.();
+                    socket.emit('call-decline', { toSocketId: fromSocketId, roomId });
+                    setIncomingCall(null);
+                    incomingCallRef.current = null;
+                    setCallState('idle');
+                    callStateRef.current = 'idle';
+                }
             }, 30000);
         };
 
         // Our call was accepted
-        const handleCallAccepted = ({ fromSocketId, alias }) => {
-            stopRingtone();
+        const handleCallAccepted = async ({ fromSocketId, alias }) => {
+            console.log('✅ call-accepted from', alias);
+            stopRingtoneRef.current?.();
+            if (ringTimeoutRef.current) clearTimeout(ringTimeoutRef.current);
             setCallState('active');
+            callStateRef.current = 'active';
+
+            // Now create peer connection and send offer
+            const pc = createPeerConnection(fromSocketId, alias);
+            try {
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                socket.emit('webrtc-offer', { roomId, offer: pc.localDescription });
+            } catch (err) {
+                console.error('Error creating offer after accept:', err);
+            }
         };
 
         // Our call was declined
         const handleCallDeclined = ({ fromSocketId, alias }) => {
-            stopRingtone();
+            console.log('❌ call-declined from', alias);
+            stopRingtoneRef.current?.();
+            if (ringTimeoutRef.current) clearTimeout(ringTimeoutRef.current);
             setCallError(`${alias || 'User'} declined the call.`);
             setTimeout(() => setCallError(''), 4000);
 
-            // If no one else is in the call, end it
-            if (remoteStreams.size === 0) {
-                localStreamRef.current?.getTracks().forEach(t => t.stop());
-                localStreamRef.current = null;
-                setLocalStream(null);
-                setCallState('idle');
-            }
+            localStreamRef.current?.getTracks().forEach(t => t.stop());
+            localStreamRef.current = null;
+            setLocalStream(null);
+            setCallState('idle');
+            callStateRef.current = 'idle';
         };
 
         // Caller cancelled
         const handleCallCancelled = ({ alias }) => {
-            stopRingtone();
+            console.log('🚫 call-cancelled from', alias);
+            stopRingtoneRef.current?.();
+            if (ringTimeoutRef.current) clearTimeout(ringTimeoutRef.current);
             setIncomingCall(null);
-            if (callState === 'ringing') {
+            incomingCallRef.current = null;
+            if (callStateRef.current === 'ringing') {
                 setCallState('idle');
+                callStateRef.current = 'idle';
             }
         };
 
         // Peer ended call
         const handleCallEnded = ({ fromSocketId }) => {
+            stopRingtoneRef.current?.();
             cleanupPeer(fromSocketId);
-            if (remoteStreams.size <= 1) {
-                // Last remote peer left, end our call too
-                stopRingtone();
-                localStreamRef.current?.getTracks().forEach(t => t.stop());
-                localStreamRef.current = null;
-                setLocalStream(null);
-                peerConnections.current.forEach(pc => pc.close());
-                peerConnections.current.clear();
-                setRemoteStreams(new Map());
-                setCallState('idle');
-            }
+            // End our call too
+            if (ringTimeoutRef.current) clearTimeout(ringTimeoutRef.current);
+            localStreamRef.current?.getTracks().forEach(t => t.stop());
+            localStreamRef.current = null;
+            setLocalStream(null);
+            peerConnections.current.forEach(pc => pc.close());
+            peerConnections.current.clear();
+            setRemoteStreams(new Map());
+            setCallState('idle');
+            callStateRef.current = 'idle';
         };
 
-        // WebRTC signaling handlers
+        // WebRTC signaling
         const handleOffer = async ({ offer, fromSocketId, fromAlias }) => {
             if (!localStreamRef.current) return;
             const pc = createPeerConnection(fromSocketId, fromAlias);
@@ -383,7 +444,7 @@ export function useWebRTC(socketRef, roomId) {
                 try {
                     await pc.setRemoteDescription(new RTCSessionDescription(answer));
                 } catch (err) {
-                    console.error('Error setting remote description:', err);
+                    console.error('Error setting remote desc:', err);
                 }
             }
         };
@@ -443,26 +504,27 @@ export function useWebRTC(socketRef, roomId) {
             socket.off('peer-media-toggle', handleMediaToggle);
             socket.off('peer-disconnected', handlePeerDisconnected);
         };
-    }, [socketRef, roomId, callState, remoteStreams, createPeerConnection, cleanupPeer, playRingtone, stopRingtone]);
+        // Only depend on socketRef, roomId, and socketReady — use refs for all mutable state
+    }, [socketRef, roomId, socketReady, createPeerConnection, cleanupPeer]);
 
     // Cleanup on unmount
     useEffect(() => {
         return () => {
-            stopRingtone();
+            if (ringTimeoutRef.current) clearTimeout(ringTimeoutRef.current);
             localStreamRef.current?.getTracks().forEach(t => t.stop());
             peerConnections.current.forEach(pc => pc.close());
         };
-    }, [stopRingtone]);
+    }, []);
 
     return {
         localStream,
         remoteStreams,
-        callState,     // idle | calling | ringing | active
-        callType,      // video | voice
+        callState,
+        callType,
         isMicOn,
         isCameraOn,
         callError,
-        incomingCall,  // { fromSocketId, alias, callType }
+        incomingCall,
         startCall,
         cancelCall,
         acceptCall,
