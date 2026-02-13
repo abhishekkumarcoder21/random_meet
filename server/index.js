@@ -15,18 +15,36 @@ const app = express();
 const server = http.createServer(app);
 const prisma = new PrismaClient();
 
+// Parse allowed origins from FRONTEND_URL (supports comma-separated values)
+const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:3000')
+  .split(',')
+  .map(url => url.trim().replace(/\/+$/, '')); // strip trailing slashes
+
+console.log('🌐 Allowed CORS origins:', allowedOrigins);
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, curl, server-to-server)
+    if (!origin) return callback(null, true);
+    const normalizedOrigin = origin.replace(/\/+$/, '');
+    if (allowedOrigins.includes(normalizedOrigin)) {
+      callback(null, true);
+    } else {
+      console.warn(`⚠️ CORS blocked request from origin: ${origin}`);
+      callback(new Error(`CORS: Origin ${origin} not allowed`));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
+
 const io = new Server(server, {
-  cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-    methods: ['GET', 'POST']
-  }
+  cors: corsOptions
 });
 
 // Middleware
-app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-  credentials: true
-}));
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Make prisma available in routes
@@ -41,7 +59,12 @@ app.use('/api/subscription', subscriptionRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+    corsOrigins: allowedOrigins
+  });
 });
 
 

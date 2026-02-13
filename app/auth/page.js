@@ -20,6 +20,7 @@ export default function AuthPage() {
         setLoading(true);
 
         try {
+            console.log('[Auth] Sending OTP to:', `${API_URL}/api/auth/send-otp`);
             const res = await fetch(`${API_URL}/api/auth/send-otp`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -31,7 +32,12 @@ export default function AuthPage() {
 
             setStep('otp');
         } catch (err) {
-            setError(err.message || 'Failed to send OTP');
+            console.error('[Auth] Send OTP error:', err);
+            if (err instanceof TypeError && err.message === 'Failed to fetch') {
+                setError(`Cannot reach server at: ${API_URL}. Please check your connection.`);
+            } else {
+                setError(err.message || 'Failed to send OTP');
+            }
         } finally {
             setLoading(false);
         }
