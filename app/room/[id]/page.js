@@ -65,9 +65,13 @@ export default function RoomPage({ params }) {
         });
 
         socket.on('new-message', (msg) => {
+            // Skip messages from self — we already added them optimistically
+            const myAlias = localStorage.getItem('rm_alias');
+            if (msg.alias === myAlias) return;
+
             setMessages(prev => [...prev, {
                 ...msg,
-                isMe: msg.alias === localStorage.getItem('rm_alias')
+                isMe: false
             }]);
         });
 
@@ -145,7 +149,9 @@ export default function RoomPage({ params }) {
             });
             const data = await res.json();
             setRoomInfo(data);
-            setMyAlias(data.myAlias || localStorage.getItem('rm_alias') || '');
+            const alias = data.myAlias || '';
+            setMyAlias(alias);
+            if (alias) localStorage.setItem('rm_alias', alias);
             if (data.startedAt && data.durationMinutes) {
                 startTimer(new Date(data.startedAt), data.durationMinutes);
             }

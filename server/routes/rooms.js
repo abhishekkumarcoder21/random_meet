@@ -2,7 +2,7 @@ const express = require('express');
 const { authMiddleware } = require('../middleware/auth');
 const router = express.Router();
 
-const FREE_ROOM_LIMIT = 3;
+const FREE_ROOM_LIMIT = 100;
 const PREMIUM_ROOM_LIMIT = 15;
 
 const ALIASES = [
@@ -70,8 +70,19 @@ router.get('/', authMiddleware, async (req, res) => {
     }
 });
 
+// POST /api/rooms/:id/join — join a room (alternative URL pattern)
+router.post('/:id/join', authMiddleware, async (req, res) => {
+    req.params.id = req.params.id; // same handler
+    // Forward to the join logic below
+    return joinRoomHandler(req, res);
+});
+
 // POST /api/rooms/join/:id — join a room
 router.post('/join/:id', authMiddleware, async (req, res) => {
+    return joinRoomHandler(req, res);
+});
+
+async function joinRoomHandler(req, res) {
     try {
         const prisma = req.app.get('prisma');
         const user = await prisma.user.findUnique({ where: { id: req.userId } });
@@ -167,7 +178,7 @@ router.post('/join/:id', authMiddleware, async (req, res) => {
         console.error('Join room error:', err);
         res.status(500).json({ error: 'Failed to join room' });
     }
-});
+}
 
 // GET /api/rooms/:id — get room details
 router.get('/:id', authMiddleware, async (req, res) => {

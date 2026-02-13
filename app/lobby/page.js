@@ -53,7 +53,7 @@ export default function LobbyPage() {
         setJoining(roomId);
         try {
             const token = localStorage.getItem('rm_token');
-            const res = await fetch(`${API_URL}/api/rooms/${roomId}/join`, {
+            const res = await fetch(`${API_URL}/api/rooms/join/${roomId}`, {
                 method: 'POST',
                 headers: { Authorization: `Bearer ${token}` }
             });
@@ -79,8 +79,8 @@ export default function LobbyPage() {
     };
 
     const filteredRooms = rooms.filter(room => {
-        if (filter !== 'all' && room.type?.toLowerCase().replace(/[\s_]/g, '') !== filter) return false;
-        if (search && !room.name?.toLowerCase().includes(search.toLowerCase())) return false;
+        if (filter !== 'all' && room.type?.toLowerCase().replace(/[\s_-]/g, '') !== filter) return false;
+        if (search && !room.title?.toLowerCase().includes(search.toLowerCase())) return false;
         return true;
     });
 
@@ -95,16 +95,22 @@ export default function LobbyPage() {
 
     const getRoomIcon = (type) => {
         const icons = {
-            'quick_chat': '💬', 'group_prompt': '🗣️', 'confession_room': '🤫',
-            'task_collab': '🤝', 'listening_circle': '👂'
+            'quick_chat': '💬', 'quick-chat': '💬',
+            'group_prompt': '🗣️', 'group-prompt': '🗣️',
+            'confession_room': '🤫', 'confession': '🤫',
+            'task_collab': '🤝', 'task-collab': '🤝',
+            'listening_circle': '👂', 'listening-circle': '👂'
         };
         return icons[type] || '💬';
     };
 
     const getRoomColor = (type) => {
         const colors = {
-            'quick_chat': '#7c3aed', 'group_prompt': '#ec4899', 'confession_room': '#10b981',
-            'task_collab': '#f59e0b', 'listening_circle': '#60a5fa'
+            'quick_chat': '#7c3aed', 'quick-chat': '#7c3aed',
+            'group_prompt': '#ec4899', 'group-prompt': '#ec4899',
+            'confession_room': '#10b981', 'confession': '#10b981',
+            'task_collab': '#f59e0b', 'task-collab': '#f59e0b',
+            'listening_circle': '#60a5fa', 'listening-circle': '#60a5fa'
         };
         return colors[type] || '#7c3aed';
     };
@@ -223,7 +229,7 @@ export default function LobbyPage() {
                         <div className={styles.roomGrid}>
                             {filteredRooms.map((room, i) => {
                                 const color = getRoomColor(room.type);
-                                const currentCount = room._count?.participants || room.participantCount || 0;
+                                const currentCount = room.currentParticipants || room._count?.participants || 0;
                                 const maxCount = room.maxParticipants || 2;
                                 const isFull = currentCount >= maxCount;
                                 const isActive = room.status === 'active';
@@ -250,7 +256,7 @@ export default function LobbyPage() {
                                         </div>
 
                                         {/* Title & prompt */}
-                                        <h3 className={styles.cardTitle}>{room.name || 'Unnamed Room'}</h3>
+                                        <h3 className={styles.cardTitle}>{room.title || room.name || 'Unnamed Room'}</h3>
                                         {room.prompt && (
                                             <p className={styles.cardPrompt}>"{room.prompt}"</p>
                                         )}
@@ -259,7 +265,7 @@ export default function LobbyPage() {
                                         <div className={styles.cardMeta}>
                                             <div className={styles.metaItem}>
                                                 <span>⏱</span>
-                                                <span>{room.duration || 5} min</span>
+                                                <span>{room.durationMinutes || room.duration || 5} min</span>
                                             </div>
                                             <div className={styles.metaItem}>
                                                 <span>👥</span>

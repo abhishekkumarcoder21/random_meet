@@ -29,11 +29,11 @@
     position: sticky;
     top: 0;
     z-index: 100;
-    padding: 0.85rem 0;
-    background: rgba(10, 10, 18, 0.7);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border-bottom: 1px solid var(--border-subtle);
+    padding: 0.75rem 0;
+    background: rgba(10, 10, 18, 0.8);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .navInner {
@@ -75,9 +75,10 @@
     align-items: center;
     justify-content: center;
     font-weight: 700;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     color: white;
-    box-shadow: 0 0 12px rgba(124, 58, 237, 0.25);
+    box-shadow: 0 0 16px rgba(124, 58, 237, 0.3);
+    border: 2px solid rgba(124, 58, 237, 0.25);
 }
 
 /* ====== MAIN ====== */
@@ -103,14 +104,19 @@
 .greeting {
     font-size: 2rem;
     font-weight: 800;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.03em;
     margin-bottom: 0.4rem;
+    background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent-secondary) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
 }
 
 .wave {
     display: inline-block;
     animation: wave 2s ease-in-out infinite;
     transform-origin: 70% 70%;
+    -webkit-text-fill-color: initial;
 }
 
 .subtitle {
@@ -123,12 +129,13 @@
 
 .statsCard {
     flex-shrink: 0;
-    background: var(--bg-card);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-lg);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 18px;
     padding: 1.25rem 1.5rem;
-    min-width: 220px;
+    min-width: 230px;
     backdrop-filter: blur(20px);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
 }
 
 .statsRow {
@@ -147,6 +154,7 @@
     font-size: 0.85rem;
     font-weight: 700;
     color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
 }
 
 .progressBar {
@@ -162,7 +170,7 @@
     height: 100%;
     background: var(--gradient-button);
     border-radius: 100px;
-    transition: width var(--transition-slow);
+    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .statsRemaining {
@@ -197,28 +205,30 @@
 
 .searchIcon {
     position: absolute;
-    left: 1rem;
+    left: 1.15rem;
     top: 50%;
     transform: translateY(-50%);
     font-size: 0.9rem;
     pointer-events: none;
+    opacity: 0.6;
 }
 
 .searchInput {
     width: 100%;
-    padding: 0.85rem 1rem 0.85rem 2.75rem;
-    background: var(--bg-card);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-md);
+    padding: 0.85rem 1rem 0.85rem 2.85rem;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 14px;
     color: var(--text-primary);
-    font-size: 0.95rem;
-    transition: all var(--transition-base);
+    font-size: 0.92rem;
+    transition: all 0.3s ease;
     backdrop-filter: blur(10px);
 }
 
 .searchInput:focus {
-    border-color: var(--accent-primary);
-    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+    border-color: rgba(124, 58, 237, 0.35);
+    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.08), 0 0 20px rgba(124, 58, 237, 0.06);
+    background: rgba(255, 255, 255, 0.06);
     outline: none;
 }
 
@@ -237,52 +247,59 @@
     align-items: center;
     gap: 0.4rem;
     padding: 0.5rem 1rem;
-    background: var(--bg-card);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-pill);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 100px;
     color: var(--text-secondary);
     font-size: 0.8rem;
     font-weight: 500;
     cursor: pointer;
-    transition: all var(--transition-base);
+    transition: all 0.25s ease;
     white-space: nowrap;
 }
 
 .filterPill:hover {
-    border-color: var(--border-hover);
+    border-color: rgba(255, 255, 255, 0.12);
     color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.05);
 }
 
 .filterActive {
-    background: rgba(124, 58, 237, 0.1);
+    background: rgba(124, 58, 237, 0.12);
     border-color: rgba(124, 58, 237, 0.3);
     color: var(--accent-secondary);
+    box-shadow: 0 0 12px rgba(124, 58, 237, 0.1);
 }
 
 /* ====== ROOM GRID ====== */
 
 .roomGrid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
     gap: 1.25rem;
 }
 
 .roomCard {
     position: relative;
-    background: var(--bg-card);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-lg);
+    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 20px;
     padding: 1.5rem;
-    transition: all var(--transition-base);
+    transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
     overflow: hidden;
     opacity: 0;
-    animation: fadeIn 0.4s ease-out forwards;
+    animation: cardFadeIn 0.5s ease-out forwards;
+    display: flex;
+    flex-direction: column;
 }
 
 .roomCard:hover {
-    border-color: var(--border-hover);
-    transform: translateY(-4px);
-    box-shadow: var(--shadow-glow);
+    border-color: rgba(124, 58, 237, 0.25);
+    transform: translateY(-6px);
+    box-shadow:
+        0 0 30px rgba(124, 58, 237, 0.08),
+        0 12px 40px rgba(0, 0, 0, 0.25);
+    background: rgba(255, 255, 255, 0.05);
 }
 
 .cardGlow {
@@ -290,22 +307,55 @@
     inset: 0;
     pointer-events: none;
     opacity: 0;
-    transition: opacity var(--transition-slow);
+    transition: opacity 0.5s ease;
 }
 
 .roomCard:hover .cardGlow {
     opacity: 1;
 }
 
+/* Gradient border on hover */
+.roomCard::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: 21px;
+    padding: 1px;
+    background: linear-gradient(135deg, rgba(124, 58, 237, 0.3), rgba(236, 72, 153, 0.15), transparent 60%);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.35s ease;
+}
+
+.roomCard:hover::before {
+    opacity: 1;
+}
+
+@keyframes cardFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(16px) scale(0.97);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
 .cardTop {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 0.75rem;
+    margin-bottom: 0.85rem;
 }
 
 .roomEmoji {
-    font-size: 2rem;
+    font-size: 2.2rem;
+    filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.3));
 }
 
 .liveDot {
@@ -315,31 +365,37 @@
     background: var(--accent-soft);
     display: inline-block;
     animation: pulse-soft 1.5s ease infinite;
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
 }
 
 .cardTitle {
-    font-size: 1.05rem;
+    font-size: 1.1rem;
     font-weight: 700;
     margin-bottom: 0.3rem;
     line-height: 1.3;
+    letter-spacing: -0.01em;
+    color: var(--text-primary);
 }
 
 .cardPrompt {
     font-size: 0.8rem;
     color: var(--text-muted);
     font-style: italic;
-    margin-bottom: 0.75rem;
-    line-height: 1.5;
+    margin-bottom: 0.85rem;
+    line-height: 1.6;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+    opacity: 0.8;
 }
 
 .cardMeta {
     display: flex;
-    gap: 1rem;
-    margin-bottom: 0.75rem;
+    gap: 1.25rem;
+    margin-bottom: 0.85rem;
+    margin-top: auto;
+    padding-top: 0.5rem;
 }
 
 .metaItem {
@@ -348,12 +404,13 @@
     gap: 0.35rem;
     font-size: 0.8rem;
     color: var(--text-muted);
+    font-weight: 500;
 }
 
 /* Capacity Bar */
 .capacityBar {
     width: 100%;
-    height: 3px;
+    height: 4px;
     background: rgba(255, 255, 255, 0.05);
     border-radius: 100px;
     overflow: hidden;
@@ -363,14 +420,17 @@
 .capacityFill {
     height: 100%;
     border-radius: 100px;
-    transition: width var(--transition-slow);
+    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Join Button */
 .joinBtn {
     width: 100%;
-    padding: 0.7rem;
+    padding: 0.75rem;
     font-size: 0.85rem;
+    border-radius: 12px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
 }
 
 /* ====== EMPTY STATE ====== */
@@ -381,7 +441,7 @@
 }
 
 .emptyIcon {
-    font-size: 3rem;
+    font-size: 3.5rem;
     display: block;
     margin-bottom: 1rem;
 }
@@ -389,6 +449,7 @@
 .emptyState h3 {
     font-size: 1.25rem;
     margin-bottom: 0.5rem;
+    color: var(--text-primary);
 }
 
 .emptyState p {
@@ -489,9 +550,15 @@
         overflow-x: auto;
         flex-wrap: nowrap;
         padding-bottom: 0.5rem;
+        -ms-overflow-style: none;
+        scrollbar-width: none;
     }
 
     .filters::-webkit-scrollbar {
         display: none;
+    }
+
+    .roomCard {
+        border-radius: 16px;
     }
 }

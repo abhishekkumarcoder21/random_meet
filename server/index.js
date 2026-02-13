@@ -62,8 +62,8 @@ async function ensureRoomsAvailable() {
     { type: 'quick-chat', title: 'Quick Chat', maxParticipants: 2, durationMinutes: 5, isPremium: false, prompt: 'Have a genuine 5-minute conversation with a stranger. No pressure, just be yourself.' },
     { type: 'group-prompt', title: 'Group Prompt', maxParticipants: 5, durationMinutes: 10, isPremium: false, prompt: null },
     { type: 'confession', title: 'Confession Room', maxParticipants: 6, durationMinutes: 3, isPremium: false, prompt: 'Share something anonymously. No judgement here.' },
-    { type: 'task-collab', title: 'Two Strangers, One Task', maxParticipants: 2, durationMinutes: 8, isPremium: true, prompt: null },
-    { type: 'listening-circle', title: 'Listening Circle', maxParticipants: 4, durationMinutes: 7, isPremium: true, prompt: 'One person shares, others listen and support with reactions.' },
+    { type: 'task-collab', title: 'Two Strangers, One Task', maxParticipants: 2, durationMinutes: 8, isPremium: false, prompt: null },
+    { type: 'listening-circle', title: 'Listening Circle', maxParticipants: 4, durationMinutes: 7, isPremium: false, prompt: 'One person shares, others listen and support with reactions.' },
   ];
 
   const groupPrompts = [

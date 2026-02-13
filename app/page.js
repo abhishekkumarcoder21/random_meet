@@ -178,30 +178,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Values */}
-      <section className={styles.valuesSection}>
-        <div className="container">
-          <p className={styles.sectionTag}>Our Promise</p>
-          <h2 className={styles.sectionTitle}>What we don't do</h2>
-          <p className={styles.sectionSubtitle}>We built the anti-social-media. On purpose.</p>
-          <div className={styles.valuesGrid}>
-            {['Infinite scroll', 'Public feeds', 'Likes & followers', 'Influencer culture', 'Dating mechanics', 'Ad-driven revenue'].map((val, i) => (
-              <div key={i} className={styles.valueCard}>
-                <span className={styles.valueX}>✕</span>
-                <span>{val}</span>
-              </div>
-            ))}
-          </div>
-          <div className={styles.valuesPositive}>
-            {['Real conversations', 'Genuine connection', 'Respectful spaces', 'Clean endings'].map((val, i) => (
-              <div key={i} className={styles.valuePositiveCard}>
-                <span className={styles.valueCheck}>✓</span>
-                <span>{val}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+
 
       {/* CTA */}
       <section className={styles.ctaSection}>

@@ -109,7 +109,7 @@ function setupSocketHandlers(io, prisma) {
                     }
                 });
 
-                io.to(roomId).emit('new-message', {
+                socket.to(roomId).emit('new-message', {
                     id: message.id,
                     content: message.content,
                     alias: socket.alias,
