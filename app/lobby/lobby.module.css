@@ -1,0 +1,286 @@
+.loadingPage {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    color: var(--text-secondary);
+    position: relative;
+    z-index: 1;
+}
+
+.lobbyPage {
+    min-height: 100vh;
+    position: relative;
+    z-index: 1;
+}
+
+/* Header */
+.header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    padding: 0.85rem 0;
+    background: rgba(15, 15, 18, 0.8);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.headerInner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.headerLeft {
+    display: flex;
+    align-items: center;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.logoIcon {
+    font-size: 1.3rem;
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.headerRight {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+/* Main */
+.main {
+    padding: 2rem 0 4rem;
+}
+
+/* Welcome */
+.welcomeSection {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+.welcomeTitle {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+}
+
+.welcomeSubtitle {
+    color: var(--text-secondary);
+    font-size: 1rem;
+}
+
+.usageCard {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 1rem 1.25rem;
+    min-width: 240px;
+}
+
+.usageBar {
+    width: 100%;
+    height: 6px;
+    background: var(--bg-secondary);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+}
+
+.usageFill {
+    height: 100%;
+    background: var(--gradient-primary);
+    border-radius: 3px;
+    transition: width 0.4s ease;
+}
+
+.usageText {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+}
+
+.errorMsg {
+    background: rgba(244, 63, 94, 0.1);
+    border: 1px solid rgba(244, 63, 94, 0.2);
+    border-radius: var(--radius-md);
+    padding: 0.75rem 1rem;
+    color: #f87171;
+    font-size: 0.9rem;
+    margin-bottom: 1.5rem;
+    text-align: center;
+}
+
+/* Filters */
+.filters {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1.75rem;
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+}
+
+.filterBtn {
+    padding: 0.5rem 1rem;
+    border-radius: 100px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+}
+
+.filterBtn:hover {
+    border-color: var(--border-hover);
+    color: var(--text-primary);
+}
+
+.filterActive {
+    background: rgba(124, 109, 240, 0.12);
+    border-color: rgba(124, 109, 240, 0.3);
+    color: var(--accent-secondary);
+}
+
+/* Room Grid */
+.roomGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 1.25rem;
+}
+
+.roomCard {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    transition: all var(--transition-base);
+    animation: fadeIn 0.4s ease-out forwards;
+    opacity: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.roomCard:hover {
+    border-color: var(--border-hover);
+    box-shadow: var(--shadow-glow);
+}
+
+.roomCardTop {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+}
+
+.roomCardIcon {
+    font-size: 2rem;
+}
+
+.roomCardBadges {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.roomCardTitle {
+    font-size: 1.15rem;
+    margin-bottom: 0.5rem;
+}
+
+.roomCardPrompt {
+    color: var(--text-accent);
+    font-size: 0.88rem;
+    font-style: italic;
+    line-height: 1.5;
+    margin-bottom: 0.75rem;
+    flex: 1;
+}
+
+.roomCardMeta {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+}
+
+.roomCardParticipants {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-bottom: 1rem;
+}
+
+.participantChip {
+    padding: 0.2rem 0.6rem;
+    background: rgba(124, 109, 240, 0.08);
+    border: 1px solid rgba(124, 109, 240, 0.15);
+    border-radius: 100px;
+    font-size: 0.75rem;
+    color: var(--accent-secondary);
+}
+
+.joinBtn {
+    width: 100%;
+    margin-top: auto;
+}
+
+.emptyState {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--text-muted);
+    font-size: 1rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .welcomeSection {
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .usageCard {
+        min-width: auto;
+        width: 100%;
+    }
+
+    .roomGrid {
+        grid-template-columns: 1fr;
+    }
+
+    .welcomeTitle {
+        font-size: 1.6rem;
+    }
+}
+
+/* Local keyframes (CSS Modules scope animation names) */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
