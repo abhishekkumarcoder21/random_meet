@@ -44,14 +44,7 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// DEBUG: temporary endpoint to check rooms (remove in production)
-app.get('/api/debug/rooms', async (req, res) => {
-  const total = await prisma.room.count();
-  const rooms = await prisma.room.findMany({
-    select: { id: true, type: true, title: true, status: true }
-  });
-  res.json({ total, rooms });
-});
+
 
 // Socket.io handlers
 setupSocketHandlers(io, prisma);
@@ -112,7 +105,7 @@ setInterval(ensureRoomsAvailable, 30000);
 
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, async () => {
-  console.log(`🚀 Random Meeting server running on port ${PORT}`);
+  console.log(`🚀 Random Meeting server running on port ${PORT} [${process.env.NODE_ENV || 'development'}]`);
   await ensureRoomsAvailable();
   console.log('✅ Initial rooms created');
 });

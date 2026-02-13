@@ -42,9 +42,38 @@ router.post('/send-otp', async (req, res) => {
             data: { code, expiresAt, userId: user.id }
         });
 
-        // In production, send email via nodemailer/SendGrid
-        // For dev, log to console
-        console.log(`📧 OTP for ${email}: ${code}`);
+        // Send OTP via email in production, log to console in dev
+        if (process.env.NODE_ENV === 'production' && process.env.SMTP_USER && process.env.SMTP_PASS) {
+            const nodemailer = require('nodemailer');
+            const transporter = nodemailer.createTransport({
+                host: process.env.SMTP_HOST || 'smtp.gmail.com',
+                port: parseInt(process.env.SMTP_PORT) || 587,
+                secure: false,
+                auth: {
+                    user: process.env.SMTP_USER,
+                    pass: process.env.SMTP_PASS
+                }
+            });
+
+            await transporter.sendMail({
+                from: `"Random Meeting" <${process.env.SMTP_USER}>`,
+                to: email,
+                subject: 'Your Random Meeting Login Code',
+                html: `
+                    <div style="font-family: sans-serif; max-width: 400px; margin: 0 auto; padding: 20px;">
+                        <h2 style="color: #6c5ce7;">🎲 Random Meeting</h2>
+                        <p>Your login code is:</p>
+                        <div style="background: #f0f0f0; padding: 15px; border-radius: 8px; text-align: center; font-size: 32px; letter-spacing: 8px; font-weight: bold; color: #2d3436;">
+                            ${code}
+                        </div>
+                        <p style="color: #636e72; font-size: 14px; margin-top: 15px;">This code expires in 10 minutes. If you didn't request this, you can ignore this email.</p>
+                    </div>
+                `
+            });
+            console.log(`📧 OTP sent to ${email}`);
+        } else {
+            console.log(`📧 [DEV] OTP for ${email}: ${code}`);
+        }
 
         res.json({ message: 'OTP sent', email });
     } catch (err) {
