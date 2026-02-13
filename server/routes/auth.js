@@ -168,4 +168,47 @@ router.get('/me', async (req, res) => {
     }
 });
 
+// POST /api/auth/set-nickname
+router.post('/set-nickname', async (req, res) => {
+    try {
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(401).json({ error: 'Not authenticated' });
+        }
+
+        const token = authHeader.split(' ')[1];
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const prisma = req.app.get('prisma');
+
+        const { nickname } = req.body;
+        if (!nickname || nickname.trim().length < 2 || nickname.trim().length > 20) {
+            return res.status(400).json({ error: 'Nickname must be 2-20 characters' });
+        }
+
+        // Sanitize: allow letters, numbers, spaces, underscores
+        const clean = nickname.trim().replace(/[^\w\s]/g, '').substring(0, 20);
+        if (clean.length < 2) {
+            return res.status(400).json({ error: 'Nickname must contain at least 2 valid characters' });
+        }
+
+        const user = await prisma.user.update({
+            where: { id: decoded.userId },
+            data: { displayName: clean }
+        });
+
+        res.json({
+            message: 'Nickname set',
+            user: {
+                id: user.id,
+                email: user.email,
+                displayName: user.displayName,
+                isPremium: user.isPremium
+            }
+        });
+    } catch (err) {
+        console.error('Set nickname error:', err);
+        res.status(500).json({ error: 'Failed to set nickname' });
+    }
+});
+
 module.exports = router;

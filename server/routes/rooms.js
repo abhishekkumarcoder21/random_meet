@@ -60,7 +60,8 @@ router.get('/', authMiddleware, async (req, res) => {
                 roomsUsedToday: user.roomsUsedToday,
                 roomLimit,
                 roomsRemaining,
-                isPremium: user.isPremium
+                isPremium: user.isPremium,
+                displayName: user.displayName
             }
         });
     } catch (err) {
@@ -132,8 +133,8 @@ router.post('/join/:id', authMiddleware, async (req, res) => {
             return res.json({ message: 'Already in room', alias: existing.alias, roomId: room.id });
         }
 
-        // Create participant
-        const alias = getRandomAlias();
+        // Create participant — use user's nickname or fallback to random alias
+        const alias = user.displayName || getRandomAlias();
         await prisma.roomParticipant.create({
             data: { userId: user.id, roomId: room.id, alias }
         });

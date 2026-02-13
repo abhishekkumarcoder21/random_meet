@@ -1,55 +1,34 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import styles from './lobby.module.css';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
-const ROOM_ICONS = {
-    'quick-chat': '💬',
-    'group-prompt': '🗣️',
-    'confession': '🤫',
-    'task-collab': '🤝',
-    'listening-circle': '👂'
-};
-
-const ROOM_LABELS = {
-    'quick-chat': 'Quick Chat',
-    'group-prompt': 'Group Prompt',
-    'confession': 'Confession',
-    'task-collab': 'Task Collab',
-    'listening-circle': 'Listening Circle'
-};
-
 export default function LobbyPage() {
     const router = useRouter();
     const [rooms, setRooms] = useState([]);
     const [userInfo, setUserInfo] = useState(null);
-    const [filter, setFilter] = useState('all');
     const [loading, setLoading] = useState(true);
     const [joining, setJoining] = useState(null);
-    const [error, setError] = useState('');
+    const [filter, setFilter] = useState('all');
+    const [search, setSearch] = useState('');
 
-    useEffect(() => {
-        const token = localStorage.getItem('rm_token');
-        if (!token) {
-            router.push('/auth');
-            return;
-        }
-        fetchRooms();
-        const interval = setInterval(fetchRooms, 10000); // refresh every 10s
-        return () => clearInterval(interval);
-    }, []);
-
-    const fetchRooms = async () => {
+    const fetchRooms = useCallback(async () => {
         try {
             const token = localStorage.getItem('rm_token');
+            if (!token) {
+                router.push('/auth');
+                return;
+            }
+
             const res = await fetch(`${API_URL}/api/rooms`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
             if (res.status === 401) {
                 localStorage.removeItem('rm_token');
+                localStorage.removeItem('rm_user');
                 router.push('/auth');
                 return;
             }
@@ -57,42 +36,38 @@ export default function LobbyPage() {
             const data = await res.json();
             setRooms(data.rooms || []);
             setUserInfo(data.user || null);
-            setLoading(false);
         } catch (err) {
-            setError('Failed to load rooms');
+            console.error('Failed to fetch rooms:', err);
+        } finally {
             setLoading(false);
         }
-    };
+    }, [router]);
+
+    useEffect(() => {
+        fetchRooms();
+        const interval = setInterval(fetchRooms, 15000);
+        return () => clearInterval(interval);
+    }, [fetchRooms]);
 
     const handleJoin = async (roomId) => {
         setJoining(roomId);
-        setError('');
-
         try {
             const token = localStorage.getItem('rm_token');
-            const res = await fetch(`${API_URL}/api/rooms/join/${roomId}`, {
+            const res = await fetch(`${API_URL}/api/rooms/${roomId}/join`, {
                 method: 'POST',
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
+                headers: { Authorization: `Bearer ${token}` }
             });
 
             const data = await res.json();
-
             if (!res.ok) {
-                if (data.upgrade) {
-                    router.push('/upgrade');
-                    return;
-                }
-                throw new Error(data.error);
+                alert(data.error || 'Failed to join room');
+                return;
             }
 
-            // Store alias for room
-            localStorage.setItem('rm_alias', data.alias);
             router.push(`/room/${roomId}`);
         } catch (err) {
-            setError(err.message || 'Failed to join room');
+            alert('Failed to join room');
+        } finally {
             setJoining(null);
         }
     };
@@ -103,169 +78,221 @@ export default function LobbyPage() {
         router.push('/');
     };
 
-    const filteredRooms = rooms.filter(r => {
-        if (filter === 'all') return true;
-        if (filter === 'free') return !r.isPremium;
-        if (filter === 'premium') return r.isPremium;
-        return r.type === filter;
+    const filteredRooms = rooms.filter(room => {
+        if (filter !== 'all' && room.type?.toLowerCase().replace(/[\s_]/g, '') !== filter) return false;
+        if (search && !room.name?.toLowerCase().includes(search.toLowerCase())) return false;
+        return true;
     });
+
+    const filterOptions = [
+        { key: 'all', label: 'All Rooms', icon: '🏠' },
+        { key: 'quickchat', label: 'Quick Chat', icon: '💬' },
+        { key: 'groupprompt', label: 'Group Prompt', icon: '🗣️' },
+        { key: 'confessionroom', label: 'Confession', icon: '🤫' },
+        { key: 'taskcollab', label: 'Task Collab', icon: '🤝' },
+        { key: 'listeningcircle', label: 'Listening', icon: '👂' },
+    ];
+
+    const getRoomIcon = (type) => {
+        const icons = {
+            'quick_chat': '💬', 'group_prompt': '🗣️', 'confession_room': '🤫',
+            'task_collab': '🤝', 'listening_circle': '👂'
+        };
+        return icons[type] || '💬';
+    };
+
+    const getRoomColor = (type) => {
+        const colors = {
+            'quick_chat': '#7c3aed', 'group_prompt': '#ec4899', 'confession_room': '#10b981',
+            'task_collab': '#f59e0b', 'listening_circle': '#60a5fa'
+        };
+        return colors[type] || '#7c3aed';
+    };
+
+    const getInitial = () => {
+        if (userInfo?.displayName) return userInfo.displayName.charAt(0).toUpperCase();
+        return '?';
+    };
 
     if (loading) {
         return (
             <div className={styles.loadingPage}>
                 <div className="loader"></div>
-                <p>Loading rooms...</p>
+                <p className={styles.loadingText}>Finding rooms for you...</p>
             </div>
         );
     }
 
     return (
-        <div className={styles.lobbyPage}>
-            {/* Header */}
-            <header className={styles.header}>
-                <div className={`container ${styles.headerInner}`}>
-                    <div className={styles.headerLeft}>
-                        <a href="/" className={styles.logo}>
-                            <span className={styles.logoIcon}>◉</span>
-                            <span>Random Meeting</span>
-                        </a>
-                    </div>
-                    <div className={styles.headerRight}>
-                        {userInfo && !userInfo.isPremium && (
-                            <button className="btn btn-secondary btn-sm" onClick={() => router.push('/upgrade')}>
-                                ✨ Upgrade
-                            </button>
-                        )}
+        <div className={styles.lobby}>
+            {/* Nav */}
+            <nav className={styles.nav}>
+                <div className={`container ${styles.navInner}`}>
+                    <a href="/" className={styles.logo}>
+                        <span className={styles.logoIcon}>◉</span>
+                        <span className={styles.logoText}>Random Meeting</span>
+                    </a>
+                    <div className={styles.navRight}>
                         {userInfo?.isPremium && (
                             <span className="badge badge-premium">✨ Premium</span>
                         )}
-                        <button className="btn btn-ghost btn-sm" onClick={handleLogout}>
+                        <div className={styles.avatar} title={userInfo?.displayName || 'User'}>
+                            {getInitial()}
+                        </div>
+                        <button className={`btn btn-ghost btn-sm`} onClick={handleLogout}>
                             Log out
                         </button>
                     </div>
                 </div>
-            </header>
+            </nav>
 
-            {/* Main Content */}
+            {/* Main */}
             <main className={styles.main}>
                 <div className="container">
-                    {/* Welcome & Stats */}
-                    <div className={styles.welcomeSection}>
-                        <div>
-                            <h1 className={styles.welcomeTitle}>
-                                Find your room
+                    {/* Welcome Header */}
+                    <div className={styles.header}>
+                        <div className={styles.headerLeft}>
+                            <h1 className={styles.greeting}>
+                                {userInfo?.displayName ? `Hey ${userInfo.displayName}` : 'Welcome'} <span className={styles.wave}>👋</span>
                             </h1>
-                            <p className={styles.welcomeSubtitle}>
-                                Join a structured experience. Every room ends naturally.
+                            <p className={styles.subtitle}>
+                                Pick a room and meet someone new. Every conversation ends naturally.
                             </p>
                         </div>
                         {userInfo && (
-                            <div className={styles.usageCard}>
-                                <div className={styles.usageBar}>
+                            <div className={styles.statsCard}>
+                                <div className={styles.statsRow}>
+                                    <span className={styles.statsLabel}>Rooms today</span>
+                                    <span className={styles.statsValue}>{userInfo.roomsUsedToday}/{userInfo.roomLimit}</span>
+                                </div>
+                                <div className={styles.progressBar}>
                                     <div
-                                        className={styles.usageFill}
+                                        className={styles.progressFill}
                                         style={{ width: `${(userInfo.roomsUsedToday / userInfo.roomLimit) * 100}%` }}
                                     ></div>
                                 </div>
-                                <span className={styles.usageText}>
-                                    {userInfo.roomsRemaining} of {userInfo.roomLimit} rooms remaining today
+                                <span className={styles.statsRemaining}>
+                                    {userInfo.roomsRemaining} remaining
                                 </span>
+                                {!userInfo.isPremium && (
+                                    <button
+                                        className={`btn btn-sm ${styles.upgradeBtn}`}
+                                        onClick={() => router.push('/upgrade')}
+                                    >
+                                        ✨ Get Premium
+                                    </button>
+                                )}
                             </div>
                         )}
                     </div>
 
-                    {error && (
-                        <div className={styles.errorMsg}>{error}</div>
-                    )}
-
-                    {/* Filters */}
-                    <div className={styles.filters}>
-                        {[
-                            { key: 'all', label: 'All Rooms' },
-                            { key: 'quick-chat', label: '💬 Quick Chat' },
-                            { key: 'group-prompt', label: '🗣️ Group Prompt' },
-                            { key: 'confession', label: '🤫 Confession' },
-                            { key: 'task-collab', label: '🤝 Task Collab' },
-                            { key: 'listening-circle', label: '👂 Listening' },
-                        ].map(f => (
-                            <button
-                                key={f.key}
-                                className={`${styles.filterBtn} ${filter === f.key ? styles.filterActive : ''}`}
-                                onClick={() => setFilter(f.key)}
-                            >
-                                {f.label}
-                            </button>
-                        ))}
+                    {/* Search & Filter */}
+                    <div className={styles.controls}>
+                        <div className={styles.searchBox}>
+                            <span className={styles.searchIcon}>🔍</span>
+                            <input
+                                type="text"
+                                className={styles.searchInput}
+                                placeholder="Search rooms..."
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                            />
+                        </div>
+                        <div className={styles.filters}>
+                            {filterOptions.map(f => (
+                                <button
+                                    key={f.key}
+                                    className={`${styles.filterPill} ${filter === f.key ? styles.filterActive : ''}`}
+                                    onClick={() => setFilter(f.key)}
+                                >
+                                    <span>{f.icon}</span>
+                                    <span>{f.label}</span>
+                                </button>
+                            ))}
+                        </div>
                     </div>
 
                     {/* Room Grid */}
-                    <div className={styles.roomGrid}>
-                        {filteredRooms.length === 0 ? (
-                            <div className={styles.emptyState}>
-                                <p>No rooms available right now. Check back in a moment.</p>
-                            </div>
-                        ) : (
-                            filteredRooms.map((room, i) => (
-                                <div
-                                    key={room.id}
-                                    className={styles.roomCard}
-                                    style={{ animationDelay: `${i * 0.05}s` }}
-                                >
-                                    <div className={styles.roomCardTop}>
-                                        <div className={styles.roomCardIcon}>
-                                            {ROOM_ICONS[room.type] || '🌐'}
-                                        </div>
-                                        <div className={styles.roomCardBadges}>
-                                            <span className={`badge ${room.status === 'active' ? 'badge-active' : 'badge-waiting'}`}>
-                                                {room.status === 'active' ? '● Live' : '○ Waiting'}
-                                            </span>
-                                            {room.isPremium && (
-                                                <span className="badge badge-premium">✨ Premium</span>
+                    {filteredRooms.length === 0 ? (
+                        <div className={styles.emptyState}>
+                            <span className={styles.emptyIcon}>🌙</span>
+                            <h3>No rooms match your filter</h3>
+                            <p>Try a different filter or wait for new rooms to appear.</p>
+                        </div>
+                    ) : (
+                        <div className={styles.roomGrid}>
+                            {filteredRooms.map((room, i) => {
+                                const color = getRoomColor(room.type);
+                                const currentCount = room._count?.participants || room.participantCount || 0;
+                                const maxCount = room.maxParticipants || 2;
+                                const isFull = currentCount >= maxCount;
+                                const isActive = room.status === 'active';
+
+                                return (
+                                    <div
+                                        key={room.id}
+                                        className={styles.roomCard}
+                                        style={{ animationDelay: `${i * 0.06}s` }}
+                                    >
+                                        {/* Card glow */}
+                                        <div className={styles.cardGlow} style={{ background: `radial-gradient(circle at 50% 0%, ${color}12 0%, transparent 60%)` }}></div>
+
+                                        {/* Top row */}
+                                        <div className={styles.cardTop}>
+                                            <span className={styles.roomEmoji}>{getRoomIcon(room.type)}</span>
+                                            {isActive ? (
+                                                <span className={`badge badge-active`}>
+                                                    <span className={styles.liveDot}></span> Live
+                                                </span>
+                                            ) : (
+                                                <span className={`badge badge-waiting`}>Waiting</span>
                                             )}
                                         </div>
-                                    </div>
 
-                                    <h3 className={styles.roomCardTitle}>{room.title}</h3>
+                                        {/* Title & prompt */}
+                                        <h3 className={styles.cardTitle}>{room.name || 'Unnamed Room'}</h3>
+                                        {room.prompt && (
+                                            <p className={styles.cardPrompt}>"{room.prompt}"</p>
+                                        )}
 
-                                    {room.prompt && (
-                                        <p className={styles.roomCardPrompt}>"{room.prompt}"</p>
-                                    )}
-
-                                    <div className={styles.roomCardMeta}>
-                                        <span>⏱ {room.durationMinutes} min</span>
-                                        <span>👥 {room.currentParticipants}/{room.maxParticipants}</span>
-                                    </div>
-
-                                    {room.participants.length > 0 && (
-                                        <div className={styles.roomCardParticipants}>
-                                            {room.participants.map((alias, j) => (
-                                                <span key={j} className={styles.participantChip}>{alias}</span>
-                                            ))}
+                                        {/* Meta */}
+                                        <div className={styles.cardMeta}>
+                                            <div className={styles.metaItem}>
+                                                <span>⏱</span>
+                                                <span>{room.duration || 5} min</span>
+                                            </div>
+                                            <div className={styles.metaItem}>
+                                                <span>👥</span>
+                                                <span>{currentCount}/{maxCount}</span>
+                                            </div>
                                         </div>
-                                    )}
 
-                                    <button
-                                        className={`btn btn-primary ${styles.joinBtn}`}
-                                        onClick={() => handleJoin(room.id)}
-                                        disabled={
-                                            joining === room.id ||
-                                            room.currentParticipants >= room.maxParticipants ||
-                                            (userInfo && userInfo.roomsRemaining <= 0)
-                                        }
-                                    >
-                                        {joining === room.id
-                                            ? 'Joining...'
-                                            : room.currentParticipants >= room.maxParticipants
-                                                ? 'Full'
-                                                : userInfo && userInfo.roomsRemaining <= 0
-                                                    ? 'Limit Reached'
-                                                    : 'Join Room →'
-                                        }
-                                    </button>
-                                </div>
-                            ))
-                        )}
-                    </div>
+                                        {/* Capacity bar */}
+                                        <div className={styles.capacityBar}>
+                                            <div
+                                                className={styles.capacityFill}
+                                                style={{
+                                                    width: `${(currentCount / maxCount) * 100}%`,
+                                                    background: isFull ? 'rgba(239, 68, 68, 0.6)' : `${color}99`
+                                                }}
+                                            ></div>
+                                        </div>
+
+                                        {/* Join button */}
+                                        <button
+                                            className={`btn btn-primary ${styles.joinBtn}`}
+                                            onClick={() => handleJoin(room.id)}
+                                            disabled={isFull || joining === room.id || (userInfo?.roomsRemaining <= 0)}
+                                        >
+                                            {joining === room.id ? 'Joining...' :
+                                                isFull ? 'Room Full' :
+                                                    'Join Room →'}
+                                        </button>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
             </main>
         </div>
