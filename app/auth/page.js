@@ -7,113 +7,88 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 export default function AuthPage() {
     const router = useRouter();
-    const [step, setStep] = useState('email'); // email | otp | nickname
+    const [mode, setMode] = useState('login'); // login | register
     const [email, setEmail] = useState('');
-    const [otp, setOtp] = useState('');
+    const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
     const [nickname, setNickname] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
-    const handleSendOTP = async (e) => {
-        e.preventDefault();
+    const switchMode = () => {
+        setMode(mode === 'login' ? 'register' : 'login');
         setError('');
-        setLoading(true);
-
-        try {
-            console.log('[Auth] Sending OTP to:', `${API_URL}/api/auth/send-otp`);
-            const res = await fetch(`${API_URL}/api/auth/send-otp`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email })
-            });
-
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error);
-
-            setStep('otp');
-        } catch (err) {
-            console.error('[Auth] Send OTP error:', err);
-            if (err instanceof TypeError && err.message === 'Failed to fetch') {
-                setError(`Cannot reach server at: ${API_URL}. Please check your connection.`);
-            } else {
-                setError(err.message || 'Failed to send OTP');
-            }
-        } finally {
-            setLoading(false);
-        }
+        setPassword('');
+        setConfirmPassword('');
     };
 
-    const handleVerifyOTP = async (e) => {
+    const handleLogin = async (e) => {
         e.preventDefault();
         setError('');
         setLoading(true);
 
         try {
-            const res = await fetch(`${API_URL}/api/auth/verify-otp`, {
+            const res = await fetch(`${API_URL}/api/auth/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, code: otp })
+                body: JSON.stringify({ email, password })
             });
 
             const data = await res.json();
             if (!res.ok) throw new Error(data.error);
 
-            // Store token and user
             localStorage.setItem('rm_token', data.token);
-            localStorage.setItem('rm_user', JSON.stringify(data.user));
-
-            // If user already has a nickname, skip to lobby
-            if (data.user.displayName) {
-                router.push('/lobby');
-            } else {
-                setStep('nickname');
-            }
-        } catch (err) {
-            setError(err.message || 'Failed to verify OTP');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleSetNickname = async (e) => {
-        e.preventDefault();
-        setError('');
-        setLoading(true);
-
-        try {
-            const token = localStorage.getItem('rm_token');
-            const res = await fetch(`${API_URL}/api/auth/set-nickname`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`
-                },
-                body: JSON.stringify({ nickname })
-            });
-
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error);
-
-            // Update stored user with nickname
             localStorage.setItem('rm_user', JSON.stringify(data.user));
             router.push('/lobby');
         } catch (err) {
-            setError(err.message || 'Failed to set nickname');
+            if (err instanceof TypeError && err.message === 'Failed to fetch') {
+                setError(`Cannot reach server at: ${API_URL}. Please check your connection.`);
+            } else {
+                setError(err.message || 'Failed to log in');
+            }
         } finally {
             setLoading(false);
         }
     };
 
-    const getTitle = () => {
-        if (step === 'email') return 'Welcome';
-        if (step === 'otp') return 'Check your email';
-        return 'Choose your name';
-    };
+    const handleRegister = async (e) => {
+        e.preventDefault();
+        setError('');
 
-    const getSubtitle = () => {
-        if (step === 'email') return 'Enter your email to get started. No password needed.';
-        if (step === 'otp') return `We sent a 6-digit code to ${email}`;
-        return "This is how others will see you in rooms. Make it fun!";
+        if (password.length < 6) {
+            setError('Password must be at least 6 characters');
+            return;
+        }
+        if (password !== confirmPassword) {
+            setError('Passwords do not match');
+            return;
+        }
+
+        setLoading(true);
+
+        try {
+            const res = await fetch(`${API_URL}/api/auth/register`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password, nickname })
+            });
+
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error);
+
+            localStorage.setItem('rm_token', data.token);
+            localStorage.setItem('rm_user', JSON.stringify(data.user));
+            router.push('/lobby');
+        } catch (err) {
+            if (err instanceof TypeError && err.message === 'Failed to fetch') {
+                setError(`Cannot reach server at: ${API_URL}. Please check your connection.`);
+            } else {
+                setError(err.message || 'Failed to create account');
+            }
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -126,17 +101,14 @@ export default function AuthPage() {
                             <span className={styles.logoIcon}>◉</span>
                             <span>Random Meeting</span>
                         </div>
-                        <h1 className={styles.authTitle}>{getTitle()}</h1>
-                        <p className={styles.authSubtitle}>{getSubtitle()}</p>
-                    </div>
-
-                    {/* Step indicators */}
-                    <div className={styles.steps}>
-                        <div className={`${styles.stepDot} ${step === 'email' ? styles.stepActive : styles.stepDone}`}></div>
-                        <div className={styles.stepLine}></div>
-                        <div className={`${styles.stepDot} ${step === 'otp' ? styles.stepActive : step === 'nickname' ? styles.stepDone : ''}`}></div>
-                        <div className={styles.stepLine}></div>
-                        <div className={`${styles.stepDot} ${step === 'nickname' ? styles.stepActive : ''}`}></div>
+                        <h1 className={styles.authTitle}>
+                            {mode === 'login' ? 'Welcome Back' : 'Create Account'}
+                        </h1>
+                        <p className={styles.authSubtitle}>
+                            {mode === 'login'
+                                ? 'Sign in to join rooms and meet new people.'
+                                : 'Set up your account to get started.'}
+                        </p>
                     </div>
 
                     {error && (
@@ -145,8 +117,8 @@ export default function AuthPage() {
                         </div>
                     )}
 
-                    {step === 'email' && (
-                        <form onSubmit={handleSendOTP} className={styles.authForm}>
+                    {mode === 'login' && (
+                        <form onSubmit={handleLogin} className={styles.authForm}>
                             <div className={styles.inputGroup}>
                                 <label className={styles.label}>Email address</label>
                                 <input
@@ -159,55 +131,54 @@ export default function AuthPage() {
                                     autoFocus
                                 />
                             </div>
-                            <button
-                                type="submit"
-                                className="btn btn-primary btn-lg"
-                                style={{ width: '100%' }}
-                                disabled={loading || !email}
-                            >
-                                {loading ? 'Sending...' : 'Send Verification Code →'}
-                            </button>
-                        </form>
-                    )}
-
-                    {step === 'otp' && (
-                        <form onSubmit={handleVerifyOTP} className={styles.authForm}>
                             <div className={styles.inputGroup}>
-                                <label className={styles.label}>6-digit code</label>
-                                <input
-                                    type="text"
-                                    className={`input ${styles.otpInput}`}
-                                    placeholder="000000"
-                                    value={otp}
-                                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                                    maxLength={6}
-                                    required
-                                    autoFocus
-                                />
+                                <label className={styles.label}>Password</label>
+                                <div className={styles.passwordWrapper}>
+                                    <input
+                                        type={showPassword ? 'text' : 'password'}
+                                        className="input"
+                                        placeholder="Enter your password"
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        required
+                                    />
+                                    <button
+                                        type="button"
+                                        className={styles.passwordToggle}
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        tabIndex={-1}
+                                    >
+                                        {showPassword ? '🙈' : '👁️'}
+                                    </button>
+                                </div>
                             </div>
                             <button
                                 type="submit"
                                 className="btn btn-primary btn-lg"
                                 style={{ width: '100%' }}
-                                disabled={loading || otp.length !== 6}
+                                disabled={loading || !email || !password}
                             >
-                                {loading ? 'Verifying...' : 'Verify & Continue →'}
-                            </button>
-                            <button
-                                type="button"
-                                className="btn btn-ghost"
-                                style={{ width: '100%', marginTop: '0.5rem' }}
-                                onClick={() => { setStep('email'); setOtp(''); setError(''); }}
-                            >
-                                Use a different email
+                                {loading ? 'Signing in...' : 'Sign In →'}
                             </button>
                         </form>
                     )}
 
-                    {step === 'nickname' && (
-                        <form onSubmit={handleSetNickname} className={styles.authForm}>
+                    {mode === 'register' && (
+                        <form onSubmit={handleRegister} className={styles.authForm}>
                             <div className={styles.inputGroup}>
-                                <label className={styles.label}>Your nickname</label>
+                                <label className={styles.label}>Email address</label>
+                                <input
+                                    type="email"
+                                    className="input"
+                                    placeholder="you@example.com"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    required
+                                    autoFocus
+                                />
+                            </div>
+                            <div className={styles.inputGroup}>
+                                <label className={styles.label}>Nickname</label>
                                 <input
                                     type="text"
                                     className="input"
@@ -217,20 +188,61 @@ export default function AuthPage() {
                                     minLength={2}
                                     maxLength={20}
                                     required
-                                    autoFocus
                                 />
                                 <span className={styles.charCount}>{nickname.length}/20</span>
+                            </div>
+                            <div className={styles.inputGroup}>
+                                <label className={styles.label}>Password</label>
+                                <div className={styles.passwordWrapper}>
+                                    <input
+                                        type={showPassword ? 'text' : 'password'}
+                                        className="input"
+                                        placeholder="Min 6 characters"
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        minLength={6}
+                                        required
+                                    />
+                                    <button
+                                        type="button"
+                                        className={styles.passwordToggle}
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        tabIndex={-1}
+                                    >
+                                        {showPassword ? '🙈' : '👁️'}
+                                    </button>
+                                </div>
+                            </div>
+                            <div className={styles.inputGroup}>
+                                <label className={styles.label}>Confirm Password</label>
+                                <input
+                                    type={showPassword ? 'text' : 'password'}
+                                    className="input"
+                                    placeholder="Re-enter your password"
+                                    value={confirmPassword}
+                                    onChange={(e) => setConfirmPassword(e.target.value)}
+                                    minLength={6}
+                                    required
+                                />
                             </div>
                             <button
                                 type="submit"
                                 className="btn btn-primary btn-lg"
                                 style={{ width: '100%' }}
-                                disabled={loading || nickname.trim().length < 2}
+                                disabled={loading || !email || !password || !confirmPassword || nickname.trim().length < 2}
                             >
-                                {loading ? 'Saving...' : "Let's Go! →"}
+                                {loading ? 'Creating account...' : 'Create Account →'}
                             </button>
                         </form>
                     )}
+
+                    <div className={styles.authToggle}>
+                        {mode === 'login' ? (
+                            <p>Don&apos;t have an account? <button type="button" onClick={switchMode} className={styles.toggleBtn}>Create one</button></p>
+                        ) : (
+                            <p>Already have an account? <button type="button" onClick={switchMode} className={styles.toggleBtn}>Sign in</button></p>
+                        )}
+                    </div>
 
                     <p className={styles.authNote}>
                         By continuing, you agree to be respectful in all interactions.

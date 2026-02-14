@@ -5,7 +5,21 @@ const ICE_SERVERS = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'stun:stun2.l.google.com:19302' },
+        {
+            urls: 'turn:openrelay.metered.ca:80',
+            username: 'openrelayproject',
+            credential: 'openrelayproject',
+        },
+        {
+            urls: 'turn:openrelay.metered.ca:443',
+            username: 'openrelayproject',
+            credential: 'openrelayproject',
+        },
+        {
+            urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+            username: 'openrelayproject',
+            credential: 'openrelayproject',
+        },
     ]
 };
 
@@ -112,14 +126,20 @@ export function useWebRTC(socketRef, roomId, socketReady) {
         }
 
         const pc = new RTCPeerConnection(ICE_SERVERS);
+        console.log('[WebRTC] Created peer connection for', remoteSocketId);
 
         if (localStreamRef.current) {
-            localStreamRef.current.getTracks().forEach(track => {
+            const tracks = localStreamRef.current.getTracks();
+            console.log('[WebRTC] Adding', tracks.length, 'local tracks to peer connection');
+            tracks.forEach(track => {
                 pc.addTrack(track, localStreamRef.current);
             });
+        } else {
+            console.warn('[WebRTC] No local stream when creating peer connection!');
         }
 
         pc.ontrack = (event) => {
+            console.log('[WebRTC] Got remote track:', event.track.kind, 'from', remoteSocketId);
             const remoteStream = event.streams[0];
             if (remoteStream) {
                 setRemoteStreams(prev => {
@@ -146,7 +166,12 @@ export function useWebRTC(socketRef, roomId, socketReady) {
             }
         };
 
+        pc.oniceconnectionstatechange = () => {
+            console.log('[WebRTC] ICE state:', pc.iceConnectionState, 'for', remoteSocketId);
+        };
+
         pc.onconnectionstatechange = () => {
+            console.log('[WebRTC] Connection state:', pc.connectionState, 'for', remoteSocketId);
             if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
                 cleanupPeer(remoteSocketId);
             }
@@ -433,8 +458,12 @@ export function useWebRTC(socketRef, roomId, socketReady) {
 
         // WebRTC signaling
         const handleOffer = async ({ offer, fromSocketId, fromAlias }) => {
+            console.log('[WebRTC] Received offer from', fromAlias, '| callState:', callStateRef.current, '| hasStream:', !!localStreamRef.current);
             // Only reject if we're completely idle (not in any call state)
-            if (callStateRef.current === 'idle' && !localStreamRef.current) return;
+            if (callStateRef.current === 'idle' && !localStreamRef.current) {
+                console.log('[WebRTC] Rejecting offer — idle with no stream');
+                return;
+            }
             const pc = createPeerConnection(fromSocketId, fromAlias);
             try {
                 await pc.setRemoteDescription(new RTCSessionDescription(offer));

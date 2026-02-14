@@ -1,123 +1,97 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const router = express.Router();
 
-// Generate a 6-digit OTP
-function generateOTP() {
-    return Math.floor(100000 + Math.random() * 900000).toString();
-}
-
-// POST /api/auth/send-otp
-router.post('/send-otp', async (req, res) => {
+// POST /api/auth/register
+router.post('/register', async (req, res) => {
     try {
-        const { email } = req.body;
+        const { email, password, nickname } = req.body;
+
         if (!email || !email.includes('@')) {
             return res.status(400).json({ error: 'Valid email required' });
+        }
+        if (!password || password.length < 6) {
+            return res.status(400).json({ error: 'Password must be at least 6 characters' });
+        }
+        if (!nickname || nickname.trim().length < 2 || nickname.trim().length > 20) {
+            return res.status(400).json({ error: 'Nickname must be 2-20 characters' });
         }
 
         const prisma = req.app.get('prisma');
 
-        // Find or create user
-        let user = await prisma.user.findUnique({ where: { email } });
-        if (!user) {
-            user = await prisma.user.create({ data: { email } });
+        // Check if user already exists
+        const existing = await prisma.user.findUnique({ where: { email } });
+        if (existing) {
+            return res.status(409).json({ error: 'An account with this email already exists. Please log in.' });
         }
 
-        // Check if user is banned (trust score <= 0)
-        if (user.trustScore <= 0) {
-            return res.status(403).json({ error: 'Account suspended. Contact support.' });
+        // Hash password
+        const passwordHash = await bcrypt.hash(password, 10);
+
+        // Sanitize nickname
+        const cleanName = nickname.trim().replace(/[^\w\s]/g, '').substring(0, 20);
+        if (cleanName.length < 2) {
+            return res.status(400).json({ error: 'Nickname must contain at least 2 valid characters' });
         }
 
-        // Invalidate old OTPs
-        await prisma.oTP.updateMany({
-            where: { userId: user.id, used: false },
-            data: { used: true }
+        // Create user
+        const user = await prisma.user.create({
+            data: { email, passwordHash, displayName: cleanName }
         });
 
-        // Create new OTP
-        const code = generateOTP();
-        const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+        // Generate JWT
+        const token = jwt.sign(
+            { userId: user.id, email: user.email },
+            process.env.JWT_SECRET,
+            { expiresIn: '7d' }
+        );
 
-        await prisma.oTP.create({
-            data: { code, expiresAt, userId: user.id }
+        res.status(201).json({
+            token,
+            user: {
+                id: user.id,
+                email: user.email,
+                displayName: user.displayName,
+                isPremium: user.isPremium,
+                roomsUsedToday: user.roomsUsedToday,
+                trustScore: user.trustScore
+            }
         });
-
-        // Send OTP via email in production, log to console in dev
-        if (process.env.NODE_ENV === 'production' && process.env.SMTP_USER && process.env.SMTP_PASS) {
-            const nodemailer = require('nodemailer');
-            const transporter = nodemailer.createTransport({
-                host: process.env.SMTP_HOST || 'smtp.gmail.com',
-                port: parseInt(process.env.SMTP_PORT) || 587,
-                secure: false,
-                auth: {
-                    user: process.env.SMTP_USER,
-                    pass: process.env.SMTP_PASS
-                }
-            });
-
-            await transporter.sendMail({
-                from: `"Random Meeting" <${process.env.SMTP_USER}>`,
-                to: email,
-                subject: 'Your Random Meeting Login Code',
-                html: `
-                    <div style="font-family: sans-serif; max-width: 400px; margin: 0 auto; padding: 20px;">
-                        <h2 style="color: #6c5ce7;">🎲 Random Meeting</h2>
-                        <p>Your login code is:</p>
-                        <div style="background: #f0f0f0; padding: 15px; border-radius: 8px; text-align: center; font-size: 32px; letter-spacing: 8px; font-weight: bold; color: #2d3436;">
-                            ${code}
-                        </div>
-                        <p style="color: #636e72; font-size: 14px; margin-top: 15px;">This code expires in 10 minutes. If you didn't request this, you can ignore this email.</p>
-                    </div>
-                `
-            });
-            console.log(`📧 OTP sent to ${email}`);
-        } else {
-            console.log(`📧 [DEV] OTP for ${email}: ${code}`);
-        }
-
-        res.json({ message: 'OTP sent', email });
     } catch (err) {
-        console.error('Send OTP error:', err);
-        res.status(500).json({ error: 'Failed to send OTP' });
+        console.error('Register error:', err);
+        res.status(500).json({ error: 'Failed to create account' });
     }
 });
 
-// POST /api/auth/verify-otp
-router.post('/verify-otp', async (req, res) => {
+// POST /api/auth/login
+router.post('/login', async (req, res) => {
     try {
-        const { email, code } = req.body;
-        if (!email || !code) {
-            return res.status(400).json({ error: 'Email and OTP required' });
+        const { email, password } = req.body;
+
+        if (!email || !password) {
+            return res.status(400).json({ error: 'Email and password required' });
         }
 
         const prisma = req.app.get('prisma');
 
         const user = await prisma.user.findUnique({ where: { email } });
         if (!user) {
-            return res.status(404).json({ error: 'User not found' });
+            return res.status(401).json({ error: 'Invalid email or password' });
         }
 
-        // Find valid OTP
-        const otp = await prisma.oTP.findFirst({
-            where: {
-                userId: user.id,
-                code,
-                used: false,
-                expiresAt: { gt: new Date() }
-            }
-        });
-
-        if (!otp) {
-            return res.status(401).json({ error: 'Invalid or expired OTP' });
+        // Check if user is banned
+        if (user.trustScore <= 0) {
+            return res.status(403).json({ error: 'Account suspended. Contact support.' });
         }
 
-        // Mark OTP as used
-        await prisma.oTP.update({
-            where: { id: otp.id },
-            data: { used: true }
-        });
+        // Verify password
+        const valid = await bcrypt.compare(password, user.passwordHash);
+        if (!valid) {
+            return res.status(401).json({ error: 'Invalid email or password' });
+        }
 
-        // Reset daily room count if it's a new day
+        // Reset daily room count if new day
         const now = new Date();
         const lastReset = new Date(user.lastRoomReset);
         if (now.toDateString() !== lastReset.toDateString()) {
@@ -125,6 +99,7 @@ router.post('/verify-otp', async (req, res) => {
                 where: { id: user.id },
                 data: { roomsUsedToday: 0, lastRoomReset: now }
             });
+            user.roomsUsedToday = 0;
         }
 
         // Generate JWT
@@ -146,8 +121,8 @@ router.post('/verify-otp', async (req, res) => {
             }
         });
     } catch (err) {
-        console.error('Verify OTP error:', err);
-        res.status(500).json({ error: 'Failed to verify OTP' });
+        console.error('Login error:', err);
+        res.status(500).json({ error: 'Failed to log in' });
     }
 });
 

@@ -85,40 +85,8 @@
     line-height: 1.6;
 }
 
-/* Step Indicators */
-.steps {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 2rem;
-}
 
-.stepDot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.06);
-    border: 2px solid rgba(255, 255, 255, 0.1);
-    transition: all var(--transition-base);
-}
 
-.stepActive {
-    background: var(--accent-primary);
-    border-color: var(--accent-primary);
-    box-shadow: 0 0 10px rgba(124, 58, 237, 0.4);
-    transform: scale(1.15);
-}
-
-.stepDone {
-    background: var(--accent-soft);
-    border-color: var(--accent-soft);
-}
-
-.stepLine {
-    width: 40px;
-    height: 2px;
-    background: rgba(255, 255, 255, 0.06);
-}
 
 /* Form */
 .authForm {
@@ -140,12 +108,33 @@
     letter-spacing: 0.02em;
 }
 
-.otpInput {
-    text-align: center;
-    font-size: 1.75rem;
-    letter-spacing: 0.75rem;
-    font-weight: 700;
-    padding: 1rem;
+.passwordWrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.passwordWrapper .input,
+.passwordWrapper input {
+    flex: 1;
+    padding-right: 3rem;
+}
+
+.passwordToggle {
+    position: absolute;
+    right: 0.75rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.1rem;
+    padding: 0.25rem;
+    line-height: 1;
+    opacity: 0.6;
+    transition: opacity var(--transition-fast);
+}
+
+.passwordToggle:hover {
+    opacity: 1;
 }
 
 .charCount {
@@ -166,11 +155,35 @@
     margin-bottom: 0.5rem;
 }
 
+.authToggle {
+    text-align: center;
+    margin-top: 1.5rem;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.toggleBtn {
+    background: none;
+    border: none;
+    color: var(--accent-primary);
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.9rem;
+    padding: 0;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    transition: color var(--transition-fast);
+}
+
+.toggleBtn:hover {
+    color: var(--accent-secondary);
+}
+
 .authNote {
     text-align: center;
     color: var(--text-muted);
     font-size: 0.8rem;
-    margin-top: 2rem;
+    margin-top: 1.25rem;
     line-height: 1.6;
 }
 
