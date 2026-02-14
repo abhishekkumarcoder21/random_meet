@@ -5,6 +5,7 @@ import { io } from 'socket.io-client';
 import { useWebRTC } from './useWebRTC';
 import { VideoTile } from './VideoTile';
 import styles from './room.module.css';
+import { authenticatedFetch } from '@/lib/api';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 const REACTIONS = ['❤️', '👏', '🤗', '💡', '😊', '🎯'];
@@ -158,10 +159,7 @@ export default function RoomPage({ params }) {
 
     const fetchRoom = async (token) => {
         try {
-            const res = await fetch(`${API_URL}/api/rooms/${roomId}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            const data = await res.json();
+            const data = await authenticatedFetch(`/api/rooms/${roomId}`);
             setRoomInfo(data);
             const alias = data.myAlias || '';
             setMyAlias(alias);
@@ -226,13 +224,8 @@ export default function RoomPage({ params }) {
     const handleReport = async () => {
         if (!reportTarget || !reportReason) return;
         try {
-            const token = localStorage.getItem('rm_token');
-            await fetch(`${API_URL}/api/reports`, {
+            await authenticatedFetch('/api/reports', {
                 method: 'POST',
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
                 body: JSON.stringify({
                     roomId,
                     reportedId: reportTarget,

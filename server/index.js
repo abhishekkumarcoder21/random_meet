@@ -15,26 +15,10 @@ const app = express();
 const server = http.createServer(app);
 const prisma = new PrismaClient();
 
-// Parse allowed origins from FRONTEND_URL (supports comma-separated values)
-const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:3000')
-  .split(',')
-  .map(url => url.trim().replace(/\/+$/, '')); // strip trailing slashes
-
-console.log('🌐 Allowed CORS origins:', allowedOrigins);
-
+// Production-safe CORS for mobile
 const corsOptions = {
-  origin: function (origin, callback) {
-    // Allow requests with no origin (mobile apps, curl, server-to-server)
-    if (!origin) return callback(null, true);
-    const normalizedOrigin = origin.replace(/\/+$/, '');
-    if (allowedOrigins.includes(normalizedOrigin)) {
-      callback(null, true);
-    } else {
-      console.warn(`⚠️ CORS blocked request from origin: ${origin}`);
-      callback(new Error(`CORS: Origin ${origin} not allowed`));
-    }
-  },
-  credentials: true,
+  origin: '*', // Allow all origins for mobile compatibility
+  credentials: false, // Must be false when origin is '*'
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 };
@@ -62,8 +46,18 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development',
-    corsOrigins: allowedOrigins
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
+// Global error handler - MUST be after all routes
+app.use((err, req, res, next) => {
+  console.error('❌ Global error handler:', err);
+
+  // Always return valid JSON
+  res.status(err.status || 500).json({
+    success: false,
+    error: err?.message || 'Internal server error'
   });
 });
 

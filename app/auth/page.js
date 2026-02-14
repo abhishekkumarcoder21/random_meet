@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import styles from './auth.module.css';
+import { safeFetch } from '@/lib/api';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -29,24 +30,16 @@ export default function AuthPage() {
         setLoading(true);
 
         try {
-            const res = await fetch(`${API_URL}/api/auth/login`, {
+            const data = await safeFetch('/api/auth/login', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password })
             });
-
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error);
 
             localStorage.setItem('rm_token', data.token);
             localStorage.setItem('rm_user', JSON.stringify(data.user));
             router.push('/lobby');
         } catch (err) {
-            if (err instanceof TypeError && err.message === 'Failed to fetch') {
-                setError(`Cannot reach server at: ${API_URL}. Please check your connection.`);
-            } else {
-                setError(err.message || 'Failed to log in');
-            }
+            setError(err.message);
         } finally {
             setLoading(false);
         }
@@ -55,37 +48,41 @@ export default function AuthPage() {
     const handleRegister = async (e) => {
         e.preventDefault();
         setError('');
+        setLoading(true);
 
+        // Validation
+        if (!email.includes('@')) {
+            setError('Please enter a valid email');
+            setLoading(false);
+            return;
+        }
         if (password.length < 6) {
             setError('Password must be at least 6 characters');
+            setLoading(false);
             return;
         }
         if (password !== confirmPassword) {
             setError('Passwords do not match');
+            setLoading(false);
+            return;
+        }
+        if (nickname.trim().length < 2 || nickname.trim().length > 20) {
+            setError('Nickname must be 2-20 characters');
+            setLoading(false);
             return;
         }
 
-        setLoading(true);
-
         try {
-            const res = await fetch(`${API_URL}/api/auth/register`, {
+            const data = await safeFetch('/api/auth/register', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password, nickname })
             });
-
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error);
 
             localStorage.setItem('rm_token', data.token);
             localStorage.setItem('rm_user', JSON.stringify(data.user));
             router.push('/lobby');
         } catch (err) {
-            if (err instanceof TypeError && err.message === 'Failed to fetch') {
-                setError(`Cannot reach server at: ${API_URL}. Please check your connection.`);
-            } else {
-                setError(err.message || 'Failed to create account');
-            }
+            setError(err.message);
         } finally {
             setLoading(false);
         }

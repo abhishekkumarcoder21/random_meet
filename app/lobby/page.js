@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import styles from './lobby.module.css';
+import { authenticatedFetch } from '@/lib/api';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -16,28 +17,16 @@ export default function LobbyPage() {
 
     const fetchRooms = useCallback(async () => {
         try {
-            const token = localStorage.getItem('rm_token');
-            if (!token) {
-                router.push('/auth');
-                return;
-            }
-
-            const res = await fetch(`${API_URL}/api/rooms`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-
-            if (res.status === 401) {
-                localStorage.removeItem('rm_token');
-                localStorage.removeItem('rm_user');
-                router.push('/auth');
-                return;
-            }
-
-            const data = await res.json();
+            const data = await authenticatedFetch('/api/rooms');
             setRooms(data.rooms || []);
             setUserInfo(data.user || null);
         } catch (err) {
             console.error('Failed to fetch rooms:', err);
+            if (err.message.includes('Not authenticated')) {
+                localStorage.removeItem('rm_token');
+                localStorage.removeItem('rm_user');
+                router.push('/auth');
+            }
         } finally {
             setLoading(false);
         }
@@ -50,23 +39,12 @@ export default function LobbyPage() {
     }, [fetchRooms]);
 
     const handleJoin = async (roomId) => {
-        setJoining(roomId);
         try {
-            const token = localStorage.getItem('rm_token');
-            const res = await fetch(`${API_URL}/api/rooms/join/${roomId}`, {
-                method: 'POST',
-                headers: { Authorization: `Bearer ${token}` }
-            });
-
-            const data = await res.json();
-            if (!res.ok) {
-                alert(data.error || 'Failed to join room');
-                return;
-            }
-
+            setJoining(roomId);
+            await authenticatedFetch(`/api/rooms/join/${roomId}`, { method: 'POST' });
             router.push(`/room/${roomId}`);
         } catch (err) {
-            alert('Failed to join room');
+            alert(err.message || 'Failed to join room');
         } finally {
             setJoining(null);
         }
